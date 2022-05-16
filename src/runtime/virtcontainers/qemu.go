@@ -2335,6 +2335,8 @@ func genericAppendPCIeRootPort(devices []govmmQemu.Device, number uint32, machin
 				Slot:          strconv.FormatUint(uint64(i), 10),
 				Multifunction: multiFunction,
 				Addr:          addr,
+				Pref64Reserve: "64G",
+				MemReserve:    "256M",
 			},
 		)
 	}
