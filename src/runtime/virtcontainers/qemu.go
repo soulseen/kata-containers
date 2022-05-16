@@ -2183,7 +2183,7 @@ func genericAppendPCIeRootPort(devices []govmmQemu.Device, number uint32, machin
 				Multifunction: multiFunction,
 				Addr:          addr,
 				Pref64Reserve: "64G",
-				MemReserve:    "512M",
+				MemReserve:    "256M",
 			},
 		)
 	}
