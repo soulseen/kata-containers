@@ -57,6 +57,10 @@ github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
+# github.com/container-orchestrated-devices/container-device-interface v0.4.0 => /home/zvonkok/github.com/zvonkok/container-device-interface
+## explicit
+github.com/container-orchestrated-devices/container-device-interface/pkg/cdi
+github.com/container-orchestrated-devices/container-device-interface/specs-go
 # github.com/containerd/cgroups v1.0.3
 ## explicit
 github.com/containerd/cgroups
@@ -140,7 +144,7 @@ github.com/docker/go-events
 # github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
-# github.com/fsnotify/fsnotify v1.4.9
+# github.com/fsnotify/fsnotify v1.5.1
 ## explicit
 github.com/fsnotify/fsnotify
 # github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8
@@ -227,7 +231,7 @@ github.com/mdlayher/socket
 # github.com/mdlayher/vsock v1.1.0
 ## explicit
 github.com/mdlayher/vsock
-# github.com/mitchellh/mapstructure v1.1.2
+# github.com/mitchellh/mapstructure v1.4.1
 github.com/mitchellh/mapstructure
 # github.com/moby/sys/mountinfo v0.5.0
 github.com/moby/sys/mountinfo
@@ -254,6 +258,13 @@ github.com/opencontainers/runc/libcontainer/utils
 # github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
+# github.com/opencontainers/runtime-tools v0.0.0-20190417131837-cd1349b7c47e
+github.com/opencontainers/runtime-tools/error
+github.com/opencontainers/runtime-tools/filepath
+github.com/opencontainers/runtime-tools/generate
+github.com/opencontainers/runtime-tools/generate/seccomp
+github.com/opencontainers/runtime-tools/specerror
+github.com/opencontainers/runtime-tools/validate
 # github.com/opencontainers/selinux v1.10.1
 ## explicit
 github.com/opencontainers/selinux/go-selinux
@@ -299,6 +310,8 @@ github.com/sirupsen/logrus/hooks/syslog
 # github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
+# github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
+github.com/syndtr/gocapability/capability
 # github.com/urfave/cli v1.22.2
 ## explicit
 github.com/urfave/cli
@@ -309,6 +322,12 @@ github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 ## explicit
 github.com/vishvananda/netns
+# github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f
+github.com/xeipuuv/gojsonpointer
+# github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415
+github.com/xeipuuv/gojsonreference
+# github.com/xeipuuv/gojsonschema v1.2.0
+github.com/xeipuuv/gojsonschema
 # gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20220601114329-47893b162965
 ## explicit
 gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci
@@ -478,6 +497,9 @@ k8s.io/apimachinery/pkg/api/resource
 # k8s.io/cri-api v0.23.1
 ## explicit
 k8s.io/cri-api/pkg/apis/runtime/v1alpha2
+# sigs.k8s.io/yaml v1.3.0
+sigs.k8s.io/yaml
+# github.com/container-orchestrated-devices/container-device-interface => /home/zvonkok/github.com/zvonkok/container-device-interface
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2
 # github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.3
 # github.com/uber-go/atomic => go.uber.org/atomic v1.5.1

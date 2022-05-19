@@ -168,9 +168,11 @@ func (q *qemuAmd64) capabilities() types.Capabilities {
 	return caps
 }
 
+/*
 func (q *qemuAmd64) bridges(number uint32) {
 	q.Bridges = genericBridges(number, q.qemuMachine.Type)
 }
+*/
 
 func (q *qemuAmd64) cpuModel() string {
 	cpuModel := defaultCPUModel

@@ -16,6 +16,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/api"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
@@ -34,6 +35,7 @@ const (
 var (
 	// AllPCIeDevs keeps track of all PCIe devices
 	AllPCIeDevs = map[string]bool{}
+	AllPCIDevs  = map[string]bool{}
 )
 
 // VFIODevice is a vfio device meant to be passed to the hypervisor
@@ -51,6 +53,55 @@ func NewVFIODevice(devInfo *config.DeviceInfo) *VFIODevice {
 			DeviceInfo: devInfo,
 		},
 	}
+}
+
+type hotplugInfo struct {
+	cliqueID    uint32
+	attachToPCI bool
+}
+
+func getAttachAffinity() map[string]hotplugInfo {
+	var (
+		registry = cdi.GetRegistry()
+		devices  = registry.DeviceDB().ListDevices()
+		info     = make(map[string]hotplugInfo)
+	)
+	if len(devices) == 0 {
+		return nil
+	}
+
+	for _, device := range devices {
+		dev := registry.DeviceDB().GetDevice(device)
+
+		var (
+			bdf string
+			id  string
+			pci string
+		)
+
+		if _bdf, ok := dev.Annotations["bdf"]; ok {
+			bdf = _bdf
+		}
+		if _id, ok := dev.Annotations["clique-id"]; ok {
+			id = _id
+		}
+		if _pci, ok := dev.Annotations["attach-pci"]; ok {
+			pci = _pci
+		}
+
+		num, _ := strconv.ParseUint(id, 10, 32)
+
+		hpInfo := hotplugInfo{}
+
+		hpInfo.cliqueID = uint32(num)
+		if pci == "true" {
+			hpInfo.attachToPCI = true
+		} else {
+			hpInfo.attachToPCI = false
+		}
+		info[bdf] = hpInfo
+	}
+	return info
 }
 
 // Attach is standard interface of api.Device, it's used to add device to some
@@ -78,6 +129,8 @@ func (device *VFIODevice) Attach(ctx context.Context, devReceiver api.DeviceRece
 		return err
 	}
 
+	info := getAttachAffinity()
+
 	// Pass all devices in iommu group
 	for i, deviceFile := range deviceFiles {
 		//Get bdf of device eg 0000:00:1c.0
@@ -85,19 +138,26 @@ func (device *VFIODevice) Attach(ctx context.Context, devReceiver api.DeviceRece
 		if err != nil {
 			return err
 		}
+
+		attachToPCI := info[deviceBDF].attachToPCI
+
 		vfio := &config.VFIODev{
 			ID:       utils.MakeNameID("vfio", device.DeviceInfo.ID+strconv.Itoa(i), maxDevIDSize),
 			Type:     vfioDeviceType,
 			BDF:      deviceBDF,
 			SysfsDev: deviceSysfsDev,
-			IsPCIe:   IsPCIeDevice(deviceBDF),
+			IsPCIe:   IsPCIeDevice(deviceBDF) && !attachToPCI,
 			Class:    getPCIDeviceProperty(deviceBDF, PCISysFsDevicesClass),
 			Rank:     -1,
 		}
+
 		device.VfioDevs = append(device.VfioDevs, vfio)
 		if vfio.IsPCIe {
 			vfio.Rank = len(AllPCIeDevs)
 			AllPCIeDevs[vfio.BDF] = true
+		} else {
+			vfio.Rank = len(AllPCIDevs)
+			AllPCIDevs[vfio.BDF] = true
 		}
 	}
 

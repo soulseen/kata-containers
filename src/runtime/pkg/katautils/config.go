@@ -54,7 +54,7 @@ const (
 	acrnHypervisorTableType        = "acrn"
 
 	// the maximum amount of PCI bridges that can be cold plugged in a VM
-	maxPCIBridges uint32 = 5
+	//	maxPCIBridges uint32 = 5
 )
 
 type tomlConfig struct {
@@ -77,7 +77,7 @@ type factory struct {
 	Template        bool   `toml:"enable_template"`
 }
 type hypervisor struct {
-	KernelParams                   string      `toml:"kernel_params"`
+	Path                           string      `toml:"path"`
 	JailerPath                     string      `toml:"jailer_path"`
 	Kernel                         string      `toml:"kernel"`
 	CtlPath                        string      `toml:"ctlpath"`
@@ -87,7 +87,7 @@ type hypervisor struct {
 	FirmwareVolume                 string      `toml:"firmware_volume"`
 	MachineAccelerators            string      `toml:"machine_accelerators"`
 	CPUFeatures                    string      `toml:"cpu_features"`
-	Path                           string      `toml:"path"`
+	KernelParams                   string      `toml:"kernel_params"`
 	MachineType                    string      `toml:"machine_type"`
 	BlockDeviceDriver              string      `toml:"block_device_driver"`
 	EntropySource                  string      `toml:"entropy_source"`
@@ -111,41 +111,42 @@ type hypervisor struct {
 	EnableAnnotations              []string    `toml:"enable_annotations"`
 	HypervisorPathList             []string    `toml:"valid_hypervisor_paths"`
 	RxRateLimiterMaxRate           uint64      `toml:"rx_rate_limiter_max_rate"`
+	TxRateLimiterMaxRate           uint64      `toml:"tx_rate_limiter_max_rate"`
 	MemOffset                      uint64      `toml:"memory_offset"`
 	DiskRateLimiterBwMaxRate       int64       `toml:"disk_rate_limiter_bw_max_rate"`
 	DiskRateLimiterBwOneTimeBurst  int64       `toml:"disk_rate_limiter_bw_one_time_burst"`
 	DiskRateLimiterOpsMaxRate      int64       `toml:"disk_rate_limiter_ops_max_rate"`
-	DefaultMaxMemorySize           uint64      `toml:"default_maxmemory"`
+	DiskRateLimiterOpsOneTimeBurst int64       `toml:"disk_rate_limiter_ops_one_time_burst"`
 	NetRateLimiterBwMaxRate        int64       `toml:"net_rate_limiter_bw_max_rate"`
 	NetRateLimiterBwOneTimeBurst   int64       `toml:"net_rate_limiter_bw_one_time_burst"`
 	NetRateLimiterOpsMaxRate       int64       `toml:"net_rate_limiter_ops_max_rate"`
 	NetRateLimiterOpsOneTimeBurst  int64       `toml:"net_rate_limiter_ops_one_time_burst"`
-	TxRateLimiterMaxRate           uint64      `toml:"tx_rate_limiter_max_rate"`
-	DiskRateLimiterOpsOneTimeBurst int64       `toml:"disk_rate_limiter_ops_one_time_burst"`
+	VirtioFSCacheSize              uint32      `toml:"virtio_fs_cache_size"`
+	DefaultMaxVCPUs                uint32      `toml:"default_maxvcpus"`
 	MemorySize                     uint32      `toml:"default_memory"`
 	MemSlots                       uint32      `toml:"memory_slots"`
-	DefaultMaxVCPUs                uint32      `toml:"default_maxvcpus"`
+	DefaultMaxMemorySize           uint64      `toml:"default_maxmemory"`
 	DefaultBridges                 uint32      `toml:"default_bridges"`
 	Msize9p                        uint32      `toml:"msize_9p"`
 	PCIeRootPort                   uint32      `toml:"pcie_root_port"`
 	PCIeSwitchPort                 uint32      `toml:"pcie_switch_port"`
+	PCIBridgePort                  uint32      `tomp:"pci_bridge_port"`
 	NumVCPUs                       int32       `toml:"default_vcpus"`
-	VirtioFSCacheSize              uint32      `toml:"virtio_fs_cache_size"`
-	IOMMU                          bool        `toml:"enable_iommu"`
+	BlockDeviceCacheSet            bool        `toml:"block_device_cache_set"`
+	BlockDeviceCacheDirect         bool        `toml:"block_device_cache_direct"`
 	BlockDeviceCacheNoflush        bool        `toml:"block_device_cache_noflush"`
 	EnableVhostUserStore           bool        `toml:"enable_vhost_user_store"`
 	DisableBlockDeviceUse          bool        `toml:"disable_block_device_use"`
 	MemPrealloc                    bool        `toml:"enable_mem_prealloc"`
 	HugePages                      bool        `toml:"enable_hugepages"`
 	VirtioMem                      bool        `toml:"enable_virtio_mem"`
-	BlockDeviceCacheDirect         bool        `toml:"block_device_cache_direct"`
+	IOMMU                          bool        `toml:"enable_iommu"`
 	IOMMUPlatform                  bool        `toml:"enable_iommu_platform"`
 	Debug                          bool        `toml:"enable_debug"`
 	DisableNestingChecks           bool        `toml:"disable_nesting_checks"`
 	EnableIOThreads                bool        `toml:"enable_iothreads"`
 	DisableImageNvdimm             bool        `toml:"disable_image_nvdimm"`
 	HotplugVFIOOnRootBus           bool        `toml:"hotplug_vfio_on_root_bus"`
-	BlockDeviceCacheSet            bool        `toml:"block_device_cache_set"`
 	DisableVhostNet                bool        `toml:"disable_vhost_net"`
 	GuestMemoryDumpPaging          bool        `toml:"guest_memory_dump_paging"`
 	ConfidentialGuest              bool        `toml:"confidential_guest"`
@@ -434,6 +435,7 @@ func (h hypervisor) defaultMaxMemSz() uint64 {
 	return h.DefaultMaxMemorySize
 }
 
+/*
 func (h hypervisor) defaultBridges() uint32 {
 	if h.DefaultBridges == 0 {
 		return defaultBridgesCount
@@ -445,7 +447,7 @@ func (h hypervisor) defaultBridges() uint32 {
 
 	return h.DefaultBridges
 }
-
+*/
 func (h hypervisor) defaultVirtioFSCache() string {
 	if h.VirtioFSCache == "" {
 		return defaultVirtioFSCacheMode
@@ -643,23 +645,23 @@ func newFirecrackerHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 	txRateLimiterMaxRate := h.getTxRateLimiterCfg()
 
 	return vc.HypervisorConfig{
-		HypervisorPath:        hypervisor,
-		HypervisorPathList:    h.HypervisorPathList,
-		JailerPath:            jailer,
-		JailerPathList:        h.JailerPathList,
-		KernelPath:            kernel,
-		InitrdPath:            initrd,
-		ImagePath:             image,
-		FirmwarePath:          firmware,
-		KernelParams:          vc.DeserializeParams(strings.Fields(kernelParams)),
-		NumVCPUs:              h.defaultVCPUs(),
-		DefaultMaxVCPUs:       h.defaultMaxVCPUs(),
-		MemorySize:            h.defaultMemSz(),
-		MemSlots:              h.defaultMemSlots(),
-		DefaultMaxMemorySize:  h.defaultMaxMemSz(),
-		EntropySource:         h.GetEntropySource(),
-		EntropySourceList:     h.EntropySourceList,
-		DefaultBridges:        h.defaultBridges(),
+		HypervisorPath:       hypervisor,
+		HypervisorPathList:   h.HypervisorPathList,
+		JailerPath:           jailer,
+		JailerPathList:       h.JailerPathList,
+		KernelPath:           kernel,
+		InitrdPath:           initrd,
+		ImagePath:            image,
+		FirmwarePath:         firmware,
+		KernelParams:         vc.DeserializeParams(strings.Fields(kernelParams)),
+		NumVCPUs:             h.defaultVCPUs(),
+		DefaultMaxVCPUs:      h.defaultMaxVCPUs(),
+		MemorySize:           h.defaultMemSz(),
+		MemSlots:             h.defaultMemSlots(),
+		DefaultMaxMemorySize: h.defaultMaxMemSz(),
+		EntropySource:        h.GetEntropySource(),
+		EntropySourceList:    h.EntropySourceList,
+		//DefaultBridges:        h.defaultBridges(),
 		DisableBlockDeviceUse: false, // shared fs is not supported in Firecracker,
 		HugePages:             h.HugePages,
 		Debug:                 h.Debug,
@@ -746,28 +748,28 @@ func newQemuHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 	txRateLimiterMaxRate := h.getTxRateLimiterCfg()
 
 	return vc.HypervisorConfig{
-		HypervisorPath:          hypervisor,
-		HypervisorPathList:      h.HypervisorPathList,
-		KernelPath:              kernel,
-		InitrdPath:              initrd,
-		ImagePath:               image,
-		FirmwarePath:            firmware,
-		FirmwareVolumePath:      firmwareVolume,
-		PFlash:                  pflashes,
-		MachineAccelerators:     machineAccelerators,
-		CPUFeatures:             cpuFeatures,
-		KernelParams:            vc.DeserializeParams(strings.Fields(kernelParams)),
-		HypervisorMachineType:   machineType,
-		NumVCPUs:                h.defaultVCPUs(),
-		DefaultMaxVCPUs:         h.defaultMaxVCPUs(),
-		MemorySize:              h.defaultMemSz(),
-		MemSlots:                h.defaultMemSlots(),
-		MemOffset:               h.defaultMemOffset(),
-		DefaultMaxMemorySize:    h.defaultMaxMemSz(),
-		VirtioMem:               h.VirtioMem,
-		EntropySource:           h.GetEntropySource(),
-		EntropySourceList:       h.EntropySourceList,
-		DefaultBridges:          h.defaultBridges(),
+		HypervisorPath:        hypervisor,
+		HypervisorPathList:    h.HypervisorPathList,
+		KernelPath:            kernel,
+		InitrdPath:            initrd,
+		ImagePath:             image,
+		FirmwarePath:          firmware,
+		FirmwareVolumePath:    firmwareVolume,
+		PFlash:                pflashes,
+		MachineAccelerators:   machineAccelerators,
+		CPUFeatures:           cpuFeatures,
+		KernelParams:          vc.DeserializeParams(strings.Fields(kernelParams)),
+		HypervisorMachineType: machineType,
+		NumVCPUs:              h.defaultVCPUs(),
+		DefaultMaxVCPUs:       h.defaultMaxVCPUs(),
+		MemorySize:            h.defaultMemSz(),
+		MemSlots:              h.defaultMemSlots(),
+		MemOffset:             h.defaultMemOffset(),
+		DefaultMaxMemorySize:  h.defaultMaxMemSz(),
+		VirtioMem:             h.VirtioMem,
+		EntropySource:         h.GetEntropySource(),
+		EntropySourceList:     h.EntropySourceList,
+		//DefaultBridges:          h.defaultBridges(),
 		DisableBlockDeviceUse:   h.DisableBlockDeviceUse,
 		SharedFS:                sharedFS,
 		VirtioFSDaemon:          h.VirtioFSDaemon,
@@ -794,6 +796,7 @@ func newQemuHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		HotPlugVFIO:             h.HotPlugVFIO,
 		PCIeRootPort:            h.PCIeRootPort,
 		PCIeSwitchPort:          h.PCIeSwitchPort,
+		PCIBridgePort:           h.PCIBridgePort,
 		DisableVhostNet:         h.DisableVhostNet,
 		EnableVhostUserStore:    h.EnableVhostUserStore,
 		VhostUserStorePath:      h.vhostUserStorePath(),
@@ -866,14 +869,14 @@ func newAcrnHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		DefaultMaxMemorySize:  h.defaultMaxMemSz(),
 		EntropySource:         h.GetEntropySource(),
 		EntropySourceList:     h.EntropySourceList,
-		DefaultBridges:        h.defaultBridges(),
-		HugePages:             h.HugePages,
-		Debug:                 h.Debug,
-		DisableNestingChecks:  h.DisableNestingChecks,
-		BlockDeviceDriver:     blockDriver,
-		DisableVhostNet:       h.DisableVhostNet,
-		GuestHookPath:         h.guestHookPath(),
-		EnableAnnotations:     h.EnableAnnotations,
+		//DefaultBridges:        h.defaultBridges(),
+		HugePages:            h.HugePages,
+		Debug:                h.Debug,
+		DisableNestingChecks: h.DisableNestingChecks,
+		BlockDeviceDriver:    blockDriver,
+		DisableVhostNet:      h.DisableVhostNet,
+		GuestHookPath:        h.guestHookPath(),
+		EnableAnnotations:    h.EnableAnnotations,
 	}, nil
 }
 
@@ -932,25 +935,25 @@ func newClhHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 	}
 
 	return vc.HypervisorConfig{
-		HypervisorPath:                 hypervisor,
-		HypervisorPathList:             h.HypervisorPathList,
-		KernelPath:                     kernel,
-		InitrdPath:                     initrd,
-		ImagePath:                      image,
-		FirmwarePath:                   firmware,
-		MachineAccelerators:            machineAccelerators,
-		KernelParams:                   vc.DeserializeParams(strings.Fields(kernelParams)),
-		HypervisorMachineType:          machineType,
-		NumVCPUs:                       h.defaultVCPUs(),
-		DefaultMaxVCPUs:                h.defaultMaxVCPUs(),
-		MemorySize:                     h.defaultMemSz(),
-		MemSlots:                       h.defaultMemSlots(),
-		MemOffset:                      h.defaultMemOffset(),
-		DefaultMaxMemorySize:           h.defaultMaxMemSz(),
-		VirtioMem:                      h.VirtioMem,
-		EntropySource:                  h.GetEntropySource(),
-		EntropySourceList:              h.EntropySourceList,
-		DefaultBridges:                 h.defaultBridges(),
+		HypervisorPath:        hypervisor,
+		HypervisorPathList:    h.HypervisorPathList,
+		KernelPath:            kernel,
+		InitrdPath:            initrd,
+		ImagePath:             image,
+		FirmwarePath:          firmware,
+		MachineAccelerators:   machineAccelerators,
+		KernelParams:          vc.DeserializeParams(strings.Fields(kernelParams)),
+		HypervisorMachineType: machineType,
+		NumVCPUs:              h.defaultVCPUs(),
+		DefaultMaxVCPUs:       h.defaultMaxVCPUs(),
+		MemorySize:            h.defaultMemSz(),
+		MemSlots:              h.defaultMemSlots(),
+		MemOffset:             h.defaultMemOffset(),
+		DefaultMaxMemorySize:  h.defaultMaxMemSz(),
+		VirtioMem:             h.VirtioMem,
+		EntropySource:         h.GetEntropySource(),
+		EntropySourceList:     h.EntropySourceList,
+		//DefaultBridges:                 h.defaultBridges(),
 		DisableBlockDeviceUse:          h.DisableBlockDeviceUse,
 		SharedFS:                       sharedFS,
 		VirtioFSDaemon:                 h.VirtioFSDaemon,
@@ -1132,23 +1135,23 @@ func updateRuntimeConfig(configPath string, tomlConf tomlConfig, config *oci.Run
 
 func GetDefaultHypervisorConfig() vc.HypervisorConfig {
 	return vc.HypervisorConfig{
-		HypervisorPath:          defaultHypervisorPath,
-		JailerPath:              defaultJailerPath,
-		KernelPath:              defaultKernelPath,
-		ImagePath:               defaultImagePath,
-		InitrdPath:              defaultInitrdPath,
-		FirmwarePath:            defaultFirmwarePath,
-		FirmwareVolumePath:      defaultFirmwareVolumePath,
-		MachineAccelerators:     defaultMachineAccelerators,
-		CPUFeatures:             defaultCPUFeatures,
-		HypervisorMachineType:   defaultMachineType,
-		NumVCPUs:                defaultVCPUCount,
-		DefaultMaxVCPUs:         defaultMaxVCPUCount,
-		MemorySize:              defaultMemSize,
-		MemOffset:               defaultMemOffset,
-		VirtioMem:               defaultVirtioMem,
-		DisableBlockDeviceUse:   defaultDisableBlockDeviceUse,
-		DefaultBridges:          defaultBridgesCount,
+		HypervisorPath:        defaultHypervisorPath,
+		JailerPath:            defaultJailerPath,
+		KernelPath:            defaultKernelPath,
+		ImagePath:             defaultImagePath,
+		InitrdPath:            defaultInitrdPath,
+		FirmwarePath:          defaultFirmwarePath,
+		FirmwareVolumePath:    defaultFirmwareVolumePath,
+		MachineAccelerators:   defaultMachineAccelerators,
+		CPUFeatures:           defaultCPUFeatures,
+		HypervisorMachineType: defaultMachineType,
+		NumVCPUs:              defaultVCPUCount,
+		DefaultMaxVCPUs:       defaultMaxVCPUCount,
+		MemorySize:            defaultMemSize,
+		MemOffset:             defaultMemOffset,
+		VirtioMem:             defaultVirtioMem,
+		DisableBlockDeviceUse: defaultDisableBlockDeviceUse,
+		//DefaultBridges:          defaultBridgesCount,
 		MemPrealloc:             defaultEnableMemPrealloc,
 		HugePages:               defaultEnableHugePages,
 		IOMMU:                   defaultEnableIOMMU,

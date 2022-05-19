@@ -2,11 +2,14 @@ module github.com/kata-containers/kata-containers/src/runtime
 
 go 1.14
 
+replace github.com/container-orchestrated-devices/container-device-interface => /home/zvonkok/github.com/zvonkok/container-device-interface
+
 require (
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
 	github.com/BurntSushi/toml v0.3.1
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/blang/semver/v4 v4.0.0
+	github.com/container-orchestrated-devices/container-device-interface v0.4.0
 	github.com/containerd/cgroups v1.0.3
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.6
@@ -18,7 +21,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cri-o/cri-o v1.0.0-rc2.0.20170928185954-3394b3b2d6af
 	github.com/docker/go-units v0.4.0
-	github.com/fsnotify/fsnotify v1.4.9
+	github.com/fsnotify/fsnotify v1.5.1
 	github.com/go-ini/ini v1.28.2
 	github.com/go-openapi/errors v0.18.0
 	github.com/go-openapi/runtime v0.18.0

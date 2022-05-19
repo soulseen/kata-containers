@@ -277,6 +277,11 @@ type VFIODev struct {
 
 	// Rank identifies a device in a IOMMU group
 	Rank int
+
+	// CliqueID identifies a logical group that belong together
+	// e.g. to hot-plug a GPU & NIC or GPU & GPU on a switch port to
+	// enable P2P in PCIe terminiology
+	CliqueID int
 }
 
 // RNGDev represents a random number generator device

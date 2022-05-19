@@ -53,13 +53,13 @@ func newClhConfig() (HypervisorConfig, error) {
 	}
 
 	return HypervisorConfig{
-		KernelPath:                    testClhKernelPath,
-		ImagePath:                     testClhImagePath,
-		HypervisorPath:                testClhPath,
-		NumVCPUs:                      defaultVCPUs,
-		BlockDeviceDriver:             config.VirtioBlock,
-		MemorySize:                    defaultMemSzMiB,
-		DefaultBridges:                defaultBridges,
+		KernelPath:        testClhKernelPath,
+		ImagePath:         testClhImagePath,
+		HypervisorPath:    testClhPath,
+		NumVCPUs:          defaultVCPUs,
+		BlockDeviceDriver: config.VirtioBlock,
+		MemorySize:        defaultMemSzMiB,
+		//		DefaultBridges:                defaultBridges,
 		DefaultMaxVCPUs:               uint32(64),
 		SharedFS:                      config.VirtioFS,
 		VirtioFSCache:                 virtioFsCacheAlways,

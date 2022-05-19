@@ -99,12 +99,12 @@ func TestHypervisorConfigDefaults(t *testing.T) {
 	testHypervisorConfigValid(t, hypervisorConfig, true)
 
 	hypervisorConfigDefaultsExpected := &HypervisorConfig{
-		KernelPath:        fmt.Sprintf("%s/%s", testDir, testKernel),
-		ImagePath:         fmt.Sprintf("%s/%s", testDir, testImage),
-		HypervisorPath:    "",
-		NumVCPUs:          defaultVCPUs,
-		MemorySize:        defaultMemSzMiB,
-		DefaultBridges:    defaultBridges,
+		KernelPath:     fmt.Sprintf("%s/%s", testDir, testKernel),
+		ImagePath:      fmt.Sprintf("%s/%s", testDir, testImage),
+		HypervisorPath: "",
+		NumVCPUs:       defaultVCPUs,
+		MemorySize:     defaultMemSzMiB,
+		//		DefaultBridges:    defaultBridges,
 		BlockDeviceDriver: defaultBlockDriver,
 		DefaultMaxVCPUs:   defaultMaxVCPUs,
 		Msize9p:           defaultMsize9p,

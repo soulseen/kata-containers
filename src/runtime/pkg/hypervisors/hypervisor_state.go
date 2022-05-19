@@ -53,10 +53,13 @@ type HypervisorState struct {
 	Bridges           []Bridge
 	VirtiofsDaemonPid int
 	Pid               int
-	// The # of root ports to create
+	// The # of PCIe root ports to create
 	PCIeRootPort int
 	// The # of switch ports to create
-	PCIeSwitchPort       int
-	HotpluggedMemory     int
+	PCIeSwitchPort   int
+	HotpluggedMemory int
+	// The # of PCI bridge ports to create
+	PCIBridgePort int
+
 	HotplugVFIOOnRootBus bool
 }
