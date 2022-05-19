@@ -83,15 +83,10 @@ var (
 
 // SandboxStatus describes a sandbox status.
 type SandboxStatus struct {
-	ContainersStatus []ContainerStatus
-
-	// Annotations allow clients to store arbitrary values,
-	// for example to add additional status values required
-	// to support particular specifications.
-	Annotations map[string]string
-
+	Annotations      map[string]string
 	ID               string
 	Hypervisor       HypervisorType
+	ContainersStatus []ContainerStatus
 	State            types.SandboxState
 	HypervisorConfig HypervisorConfig
 }
@@ -115,55 +110,37 @@ type SandboxResourceSizing struct {
 
 // SandboxConfig is a Sandbox configuration.
 type SandboxConfig struct {
+	// Annotations keys must be unique strings and must be name-spaced
+	// with e.g. reverse domain notation (org.clearlinux.key).
+	Annotations    map[string]string
+	Hostname       string
+	HypervisorType HypervisorType
+	ID             string
+	// SandboxBindMounts - list of paths to mount into guest
+	SandboxBindMounts []string
+	// Experimental features enabled
+	Experimental []exp.Feature
 	// Volumes is a list of shared volumes between the host and the Sandbox.
 	Volumes []types.Volume
-
 	// Containers describe the list of containers within a Sandbox.
 	// This list can be empty and populated by adding containers
 	// to the Sandbox a posteriori.
 	//TODO: this should be a map to avoid duplicated containers
-	Containers []ContainerConfig
-
-	// SandboxBindMounts - list of paths to mount into guest
-	SandboxBindMounts []string
-
-	// Experimental features enabled
-	Experimental []exp.Feature
-
-	// Annotations keys must be unique strings and must be name-spaced
-	// with e.g. reverse domain notation (org.clearlinux.key).
-	Annotations map[string]string
-
-	ID string
-
-	Hostname string
-
-	HypervisorType HypervisorType
-
-	AgentConfig KataAgentConfig
-
-	NetworkConfig NetworkConfig
-
+	Containers       []ContainerConfig
+	NetworkConfig    NetworkConfig
+	AgentConfig      KataAgentConfig
 	HypervisorConfig HypervisorConfig
-
+	ShmSize          uint64
 	SandboxResources SandboxResourceSizing
-
+	VfioMode         config.VFIOModeType
 	// StaticResourceMgmt indicates if the shim should rely on statically sizing the sandbox (VM)
 	StaticResourceMgmt bool
-
-	ShmSize uint64
-
-	VfioMode config.VFIOModeType
-
 	// SharePidNs sets all containers to share the same sandbox level pid namespace.
 	SharePidNs bool
-
 	// SystemdCgroup enables systemd cgroup support
 	SystemdCgroup bool
-
 	// SandboxCgroupOnly enables cgroup only at podlevel in the host
-	SandboxCgroupOnly bool
-
+	SandboxCgroupOnly   bool
 	DisableGuestSeccomp bool
 }
 
@@ -596,6 +573,12 @@ func newSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factor
 	if err := validateHypervisorConfig(&sandboxConfig.HypervisorConfig); err != nil {
 		return nil, err
 	}
+	// Aggregate all the container devices and update the HV config
+	var devices []config.DeviceInfo
+	for _, ct := range sandboxConfig.Containers {
+		devices = append(devices, ct.DeviceInfos...)
+	}
+	sandboxConfig.HypervisorConfig.RawDevices = devices
 
 	// store doesn't require hypervisor to be stored immediately
 	if err = s.hypervisor.CreateVM(ctx, s.id, s.network, &sandboxConfig.HypervisorConfig); err != nil {
@@ -1600,7 +1583,6 @@ func (s *Sandbox) createContainers(ctx context.Context) error {
 	defer span.End()
 
 	for i := range s.config.Containers {
-
 		c, err := newContainer(ctx, s, &s.config.Containers[i])
 		if err != nil {
 			return err
@@ -1619,14 +1601,12 @@ func (s *Sandbox) createContainers(ctx context.Context) error {
 	if err := s.updateResources(ctx); err != nil {
 		return err
 	}
-
 	if err := s.resourceControllerUpdate(ctx); err != nil {
 		return err
 	}
 	if err := s.storeSandbox(ctx); err != nil {
 		return err
 	}
-
 	return nil
 }
 

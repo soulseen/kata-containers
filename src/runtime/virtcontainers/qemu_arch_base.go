@@ -141,6 +141,9 @@ type qemuArch interface {
 	// appendPCIeRootPortDevice appends a pcie-root-port device to pcie.0 bus
 	appendPCIeRootPortDevice(devices []govmmQemu.Device, number uint32, memSize32bit uint64, memSize64bit uint64) []govmmQemu.Device
 
+	// appendPCIeSwitch appends a ioh3420 device to a pcie-root-port
+	appendPCIeSwitchPortDevice(devices []govmmQemu.Device, number uint32, memSize32bit uint64, memSize64bit uint64) []govmmQemu.Device
+
 	// append vIOMMU device
 	appendIOMMU(devices []govmmQemu.Device) ([]govmmQemu.Device, error)
 
@@ -178,13 +181,18 @@ type qemuArchBase struct {
 }
 
 const (
-	defaultCores       uint32 = 1
-	defaultThreads     uint32 = 1
-	defaultCPUModel           = "host"
-	defaultBridgeBus          = "pcie.0"
-	defaultPCBridgeBus        = "pci.0"
-	maxDevIDSize              = 31
-	pcieRootPortPrefix        = "rp"
+	defaultCores                   uint32 = 1
+	defaultThreads                 uint32 = 1
+	defaultCPUModel                       = "host"
+	defaultBridgeBus                      = "pcie.0"
+	defaultPCBridgeBus                    = "pci.0"
+	maxDevIDSize                          = 31
+	maxPCIeRootPort                       = 16 // Limitation from QEMU
+	maxPCIeSwitchPort                     = 16 // Limitation from QEMU
+	pcieRootPortPrefix                    = "rp"
+	pcieSwitchPrefix                      = "sw"
+	pcieSwitchUpstreamPortPrefix          = "swup"
+	pcieSwitchDownstreamPortPrefix        = "swdp"
 )
 
 // This is the PCI start address assigned to the first bridge that
@@ -796,6 +804,13 @@ func (q *qemuArchBase) appendPCIeRootPortDevice(devices []govmmQemu.Device, numb
 	return genericAppendPCIeRootPort(devices, number, q.qemuMachine.Type, memSize32bit, memSize64bit)
 }
 
+// appendPCIeSwitchPortDevice appends a PCIe Switch with <number> ports
+func (q *qemuArchBase) appendPCIeSwitchPortDevice(devices []govmmQemu.Device, number uint32, memSize32bit uint64, memSize64bit uint64) []govmmQemu.Device {
+	return genericAppendPCIeSwitchPort(devices, number, q.qemuMachine.Type, memSize32bit, memSize64bit)
+}
+
+// getBARsMaxAddressableMemory we need to know the BAR sizes to configure the
+// PCIe Root Port or PCIe Downstream Port attaching a device with huge BARs.
 func (q *qemuArchBase) getBARsMaxAddressableMemory() (uint64, uint64) {
 
 	pci := nvpci.New()

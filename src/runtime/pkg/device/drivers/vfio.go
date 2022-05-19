@@ -29,10 +29,10 @@ const (
 	vfioRemoveIDPath    = "/sys/bus/pci/drivers/vfio-pci/remove_id"
 	iommuGroupPath      = "/sys/bus/pci/devices/%s/iommu_group"
 	vfioDevPath         = "/dev/vfio/%s"
-	pcieRootPortPrefix  = "rp"
 )
 
 var (
+	// AllPCIeDevs keeps track of all PCIe devices
 	AllPCIeDevs = map[string]bool{}
 )
 
@@ -71,7 +71,7 @@ func (device *VFIODevice) Attach(ctx context.Context, devReceiver api.DeviceRece
 	}()
 
 	vfioGroup := filepath.Base(device.DeviceInfo.HostPath)
-	iommuDevicesPath := filepath.Join(config.SysIOMMUPath, vfioGroup, "devices")
+	iommuDevicesPath := filepath.Join(config.SysIOMMUGroupPath, vfioGroup, "devices")
 
 	deviceFiles, err := os.ReadDir(iommuDevicesPath)
 	if err != nil {
@@ -81,7 +81,7 @@ func (device *VFIODevice) Attach(ctx context.Context, devReceiver api.DeviceRece
 	// Pass all devices in iommu group
 	for i, deviceFile := range deviceFiles {
 		//Get bdf of device eg 0000:00:1c.0
-		deviceBDF, deviceSysfsDev, vfioDeviceType, err := getVFIODetails(deviceFile.Name(), iommuDevicesPath)
+		deviceBDF, deviceSysfsDev, vfioDeviceType, err := GetVFIODetails(deviceFile.Name(), iommuDevicesPath)
 		if err != nil {
 			return err
 		}
@@ -90,12 +90,13 @@ func (device *VFIODevice) Attach(ctx context.Context, devReceiver api.DeviceRece
 			Type:     vfioDeviceType,
 			BDF:      deviceBDF,
 			SysfsDev: deviceSysfsDev,
-			IsPCIe:   isPCIeDevice(deviceBDF),
+			IsPCIe:   IsPCIeDevice(deviceBDF),
 			Class:    getPCIDeviceProperty(deviceBDF, PCISysFsDevicesClass),
+			Rank:     -1,
 		}
 		device.VfioDevs = append(device.VfioDevs, vfio)
 		if vfio.IsPCIe {
-			vfio.Bus = fmt.Sprintf("%s%d", pcieRootPortPrefix, len(AllPCIeDevs))
+			vfio.Rank = len(AllPCIeDevs)
 			AllPCIeDevs[vfio.BDF] = true
 		}
 	}
@@ -203,7 +204,7 @@ func (device *VFIODevice) Load(ds config.DeviceState) {
 
 // It should implement GetAttachCount() and DeviceID() as api.Device implementation
 // here it shares function from *GenericDevice so we don't need duplicate codes
-func getVFIODetails(deviceFileName, iommuDevicesPath string) (deviceBDF, deviceSysfsDev string, vfioDeviceType config.VFIODeviceType, err error) {
+func GetVFIODetails(deviceFileName, iommuDevicesPath string) (deviceBDF, deviceSysfsDev string, vfioDeviceType config.VFIODeviceType, err error) {
 	vfioDeviceType = GetVFIODeviceType(deviceFileName)
 
 	switch vfioDeviceType {

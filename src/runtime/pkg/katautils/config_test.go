@@ -550,6 +550,7 @@ func TestMinimalRuntimeConfig(t *testing.T) {
 		GuestHookPath:         defaultGuestHookPath,
 		VhostUserStorePath:    defaultVhostUserStorePath,
 		VirtioFSCache:         defaultVirtioFSCacheMode,
+		HotPlugVFIO:           defaultHotPlugVFIO,
 	}
 
 	expectedAgentConfig := vc.KataAgentConfig{

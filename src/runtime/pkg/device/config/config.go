@@ -92,8 +92,8 @@ const (
 // SysDevPrefix is static string of /sys/dev
 var SysDevPrefix = "/sys/dev"
 
-// SysIOMMUPath is static string of /sys/kernel/iommu_groups
-var SysIOMMUPath = "/sys/kernel/iommu_groups"
+// SysIOMMUGroupPath is static string of /sys/kernel/iommu_groups
+var SysIOMMUGroupPath = "/sys/kernel/iommu_groups"
 
 // SysBusPciDevicesPath is static string of /sys/bus/pci/devices
 var SysBusPciDevicesPath = "/sys/bus/pci/devices"
@@ -274,6 +274,9 @@ type VFIODev struct {
 
 	// IsPCIe specifies device is PCIe or PCI
 	IsPCIe bool
+
+	// Rank identifies a device in a IOMMU group
+	Rank int
 }
 
 // RNGDev represents a random number generator device

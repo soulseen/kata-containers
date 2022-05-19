@@ -112,6 +112,7 @@ type HypervisorInfo struct {
 	Msize9p              uint32
 	MemorySlots          uint32
 	PCIeRootPort         uint32
+	PCIeSwitchPort       uint32
 	HotplugVFIOOnRootBus bool
 	Debug                bool
 }

@@ -26,25 +26,37 @@ type CPUDevice struct {
 	ID string
 }
 
+// PCIePort distinguish only between root and switch port
+type PCIePort string
+
+const (
+	// RootPort attach VFIO devices to a root-port
+	RootPort PCIePort = "root-port"
+	// SwitchPort attach VFIO devices to a switch-port
+	SwitchPort = "switch-port"
+	// BridgePort is the default
+	BridgePort = "bridge-port"
+)
+
+// HypervisorState state of the hypervisor
 type HypervisorState struct {
 	BlockIndexMap map[int]struct{}
-
 	// Type of hypervisor, E.g. qemu/firecracker/acrn.
 	Type string
 	UUID string
 	// clh sepcific: refer to 'virtcontainers/clh.go:CloudHypervisorState'
 	APISocket string
-
-	// Belows are qemu specific
-	// Refs: virtcontainers/qemu.go:QemuState
-	Bridges []Bridge
+	// Attach a VFIO device either on a root or switch port
+	HotPlugVFIO PCIePort
 	// HotpluggedCPUs is the list of CPUs that were hot-added
-	HotpluggedVCPUs []CPUDevice
-
-	HotpluggedMemory  int
+	HotpluggedVCPUs   []CPUDevice
+	Bridges           []Bridge
 	VirtiofsDaemonPid int
 	Pid               int
-	PCIeRootPort      int
-
+	// The # of root ports to create
+	PCIeRootPort int
+	// The # of switch ports to create
+	PCIeSwitchPort       int
+	HotpluggedMemory     int
 	HotplugVFIOOnRootBus bool
 }

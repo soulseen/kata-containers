@@ -278,23 +278,16 @@ type KataAgentState struct {
 
 // nolint: govet
 type kataAgent struct {
-	ctx      context.Context
-	vmSocket interface{}
-
-	client *kataclient.AgentClient
-
-	// lock protects the client pointer
-	sync.Mutex
-
-	state KataAgentState
-
+	ctx         context.Context
+	vmSocket    interface{}
+	client      *kataclient.AgentClient
 	reqHandlers map[string]reqFunc
+	state       KataAgentState
 	kmodules    []string
-
+	sync.Mutex
 	dialTimout uint32
-
-	keepConn bool
-	dead     bool
+	keepConn   bool
+	dead       bool
 }
 
 func (k *kataAgent) Logger() *logrus.Entry {
@@ -1261,10 +1254,11 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 	k.constrainGRPCSpec(grpcSpec, passSeccomp, sandbox.config.VfioMode == config.VFIOModeGuestKernel)
 
 	req := &grpc.CreateContainerRequest{
-		ContainerId:  c.id,
-		ExecId:       c.id,
-		Storages:     ctrStorages,
-		Devices:      ctrDevices,
+		ContainerId: c.id,
+		ExecId:      c.id,
+		Storages:    ctrStorages,
+		Devices:     ctrDevices,
+		//Devices:      []*grpc.Device{},
 		OCI:          grpcSpec,
 		SandboxPidns: sharedPidNs,
 	}
@@ -1272,7 +1266,6 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 	if _, err = k.sendReq(ctx, req); err != nil {
 		return nil, err
 	}
-
 	return buildProcessFromExecID(req.ExecId)
 }
 

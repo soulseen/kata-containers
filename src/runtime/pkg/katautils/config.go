@@ -21,6 +21,7 @@ import (
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/govmm"
 	govmmQemu "github.com/kata-containers/kata-containers/src/runtime/pkg/govmm/qemu"
+	hv "github.com/kata-containers/kata-containers/src/runtime/pkg/hypervisors"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/oci"
 	vc "github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
@@ -75,83 +76,84 @@ type factory struct {
 	VMCacheNumber   uint   `toml:"vm_cache_number"`
 	Template        bool   `toml:"enable_template"`
 }
-
 type hypervisor struct {
-	Path                           string   `toml:"path"`
-	JailerPath                     string   `toml:"jailer_path"`
-	Kernel                         string   `toml:"kernel"`
-	CtlPath                        string   `toml:"ctlpath"`
-	Initrd                         string   `toml:"initrd"`
-	Image                          string   `toml:"image"`
-	Firmware                       string   `toml:"firmware"`
-	FirmwareVolume                 string   `toml:"firmware_volume"`
-	MachineAccelerators            string   `toml:"machine_accelerators"`
-	CPUFeatures                    string   `toml:"cpu_features"`
-	KernelParams                   string   `toml:"kernel_params"`
-	MachineType                    string   `toml:"machine_type"`
-	BlockDeviceDriver              string   `toml:"block_device_driver"`
-	EntropySource                  string   `toml:"entropy_source"`
-	SharedFS                       string   `toml:"shared_fs"`
-	VirtioFSDaemon                 string   `toml:"virtio_fs_daemon"`
-	VirtioFSCache                  string   `toml:"virtio_fs_cache"`
-	VhostUserStorePath             string   `toml:"vhost_user_store_path"`
-	FileBackedMemRootDir           string   `toml:"file_mem_backend"`
-	GuestHookPath                  string   `toml:"guest_hook_path"`
-	GuestMemoryDumpPath            string   `toml:"guest_memory_dump_path"`
-	SeccompSandbox                 string   `toml:"seccompsandbox"`
-	HypervisorPathList             []string `toml:"valid_hypervisor_paths"`
-	JailerPathList                 []string `toml:"valid_jailer_paths"`
-	CtlPathList                    []string `toml:"valid_ctlpaths"`
-	VirtioFSDaemonList             []string `toml:"valid_virtio_fs_daemon_paths"`
-	VirtioFSExtraArgs              []string `toml:"virtio_fs_extra_args"`
-	PFlashList                     []string `toml:"pflashes"`
-	VhostUserStorePathList         []string `toml:"valid_vhost_user_store_paths"`
-	FileBackedMemRootList          []string `toml:"valid_file_mem_backends"`
-	EntropySourceList              []string `toml:"valid_entropy_sources"`
-	EnableAnnotations              []string `toml:"enable_annotations"`
-	RxRateLimiterMaxRate           uint64   `toml:"rx_rate_limiter_max_rate"`
-	TxRateLimiterMaxRate           uint64   `toml:"tx_rate_limiter_max_rate"`
-	MemOffset                      uint64   `toml:"memory_offset"`
-	DiskRateLimiterBwMaxRate       int64    `toml:"disk_rate_limiter_bw_max_rate"`
-	DiskRateLimiterBwOneTimeBurst  int64    `toml:"disk_rate_limiter_bw_one_time_burst"`
-	DiskRateLimiterOpsMaxRate      int64    `toml:"disk_rate_limiter_ops_max_rate"`
-	DiskRateLimiterOpsOneTimeBurst int64    `toml:"disk_rate_limiter_ops_one_time_burst"`
-	NetRateLimiterBwMaxRate        int64    `toml:"net_rate_limiter_bw_max_rate"`
-	NetRateLimiterBwOneTimeBurst   int64    `toml:"net_rate_limiter_bw_one_time_burst"`
-	NetRateLimiterOpsMaxRate       int64    `toml:"net_rate_limiter_ops_max_rate"`
-	NetRateLimiterOpsOneTimeBurst  int64    `toml:"net_rate_limiter_ops_one_time_burst"`
-	VirtioFSCacheSize              uint32   `toml:"virtio_fs_cache_size"`
-	DefaultMaxVCPUs                uint32   `toml:"default_maxvcpus"`
-	MemorySize                     uint32   `toml:"default_memory"`
-	MemSlots                       uint32   `toml:"memory_slots"`
-	DefaultMaxMemorySize           uint64   `toml:"default_maxmemory"`
-	DefaultBridges                 uint32   `toml:"default_bridges"`
-	Msize9p                        uint32   `toml:"msize_9p"`
-	PCIeRootPort                   uint32   `toml:"pcie_root_port"`
-	NumVCPUs                       int32    `toml:"default_vcpus"`
-	BlockDeviceCacheSet            bool     `toml:"block_device_cache_set"`
-	BlockDeviceCacheDirect         bool     `toml:"block_device_cache_direct"`
-	BlockDeviceCacheNoflush        bool     `toml:"block_device_cache_noflush"`
-	EnableVhostUserStore           bool     `toml:"enable_vhost_user_store"`
-	DisableBlockDeviceUse          bool     `toml:"disable_block_device_use"`
-	MemPrealloc                    bool     `toml:"enable_mem_prealloc"`
-	HugePages                      bool     `toml:"enable_hugepages"`
-	VirtioMem                      bool     `toml:"enable_virtio_mem"`
-	IOMMU                          bool     `toml:"enable_iommu"`
-	IOMMUPlatform                  bool     `toml:"enable_iommu_platform"`
-	Debug                          bool     `toml:"enable_debug"`
-	DisableNestingChecks           bool     `toml:"disable_nesting_checks"`
-	EnableIOThreads                bool     `toml:"enable_iothreads"`
-	DisableImageNvdimm             bool     `toml:"disable_image_nvdimm"`
-	HotplugVFIOOnRootBus           bool     `toml:"hotplug_vfio_on_root_bus"`
-	DisableVhostNet                bool     `toml:"disable_vhost_net"`
-	GuestMemoryDumpPaging          bool     `toml:"guest_memory_dump_paging"`
-	ConfidentialGuest              bool     `toml:"confidential_guest"`
-	GuestSwap                      bool     `toml:"enable_guest_swap"`
-	Rootless                       bool     `toml:"rootless"`
-	DisableSeccomp                 bool     `toml:"disable_seccomp"`
-	DisableSeLinux                 bool     `toml:"disable_selinux"`
-	LegacySerial                   bool     `toml:"use_legacy_serial"`
+	KernelParams                   string      `toml:"kernel_params"`
+	JailerPath                     string      `toml:"jailer_path"`
+	Kernel                         string      `toml:"kernel"`
+	CtlPath                        string      `toml:"ctlpath"`
+	Initrd                         string      `toml:"initrd"`
+	Image                          string      `toml:"image"`
+	Firmware                       string      `toml:"firmware"`
+	FirmwareVolume                 string      `toml:"firmware_volume"`
+	MachineAccelerators            string      `toml:"machine_accelerators"`
+	CPUFeatures                    string      `toml:"cpu_features"`
+	Path                           string      `toml:"path"`
+	MachineType                    string      `toml:"machine_type"`
+	BlockDeviceDriver              string      `toml:"block_device_driver"`
+	EntropySource                  string      `toml:"entropy_source"`
+	SharedFS                       string      `toml:"shared_fs"`
+	VirtioFSDaemon                 string      `toml:"virtio_fs_daemon"`
+	VirtioFSCache                  string      `toml:"virtio_fs_cache"`
+	VhostUserStorePath             string      `toml:"vhost_user_store_path"`
+	FileBackedMemRootDir           string      `toml:"file_mem_backend"`
+	GuestHookPath                  string      `toml:"guest_hook_path"`
+	GuestMemoryDumpPath            string      `toml:"guest_memory_dump_path"`
+	SeccompSandbox                 string      `toml:"seccompsandbox"`
+	HotPlugVFIO                    hv.PCIePort `toml:"hotplug_vfio"`
+	JailerPathList                 []string    `toml:"valid_jailer_paths"`
+	CtlPathList                    []string    `toml:"valid_ctlpaths"`
+	VirtioFSDaemonList             []string    `toml:"valid_virtio_fs_daemon_paths"`
+	VirtioFSExtraArgs              []string    `toml:"virtio_fs_extra_args"`
+	PFlashList                     []string    `toml:"pflashes"`
+	VhostUserStorePathList         []string    `toml:"valid_vhost_user_store_paths"`
+	FileBackedMemRootList          []string    `toml:"valid_file_mem_backends"`
+	EntropySourceList              []string    `toml:"valid_entropy_sources"`
+	EnableAnnotations              []string    `toml:"enable_annotations"`
+	HypervisorPathList             []string    `toml:"valid_hypervisor_paths"`
+	RxRateLimiterMaxRate           uint64      `toml:"rx_rate_limiter_max_rate"`
+	MemOffset                      uint64      `toml:"memory_offset"`
+	DiskRateLimiterBwMaxRate       int64       `toml:"disk_rate_limiter_bw_max_rate"`
+	DiskRateLimiterBwOneTimeBurst  int64       `toml:"disk_rate_limiter_bw_one_time_burst"`
+	DiskRateLimiterOpsMaxRate      int64       `toml:"disk_rate_limiter_ops_max_rate"`
+	DefaultMaxMemorySize           uint64      `toml:"default_maxmemory"`
+	NetRateLimiterBwMaxRate        int64       `toml:"net_rate_limiter_bw_max_rate"`
+	NetRateLimiterBwOneTimeBurst   int64       `toml:"net_rate_limiter_bw_one_time_burst"`
+	NetRateLimiterOpsMaxRate       int64       `toml:"net_rate_limiter_ops_max_rate"`
+	NetRateLimiterOpsOneTimeBurst  int64       `toml:"net_rate_limiter_ops_one_time_burst"`
+	TxRateLimiterMaxRate           uint64      `toml:"tx_rate_limiter_max_rate"`
+	DiskRateLimiterOpsOneTimeBurst int64       `toml:"disk_rate_limiter_ops_one_time_burst"`
+	MemorySize                     uint32      `toml:"default_memory"`
+	MemSlots                       uint32      `toml:"memory_slots"`
+	DefaultMaxVCPUs                uint32      `toml:"default_maxvcpus"`
+	DefaultBridges                 uint32      `toml:"default_bridges"`
+	Msize9p                        uint32      `toml:"msize_9p"`
+	PCIeRootPort                   uint32      `toml:"pcie_root_port"`
+	PCIeSwitchPort                 uint32      `toml:"pcie_switch_port"`
+	NumVCPUs                       int32       `toml:"default_vcpus"`
+	VirtioFSCacheSize              uint32      `toml:"virtio_fs_cache_size"`
+	IOMMU                          bool        `toml:"enable_iommu"`
+	BlockDeviceCacheNoflush        bool        `toml:"block_device_cache_noflush"`
+	EnableVhostUserStore           bool        `toml:"enable_vhost_user_store"`
+	DisableBlockDeviceUse          bool        `toml:"disable_block_device_use"`
+	MemPrealloc                    bool        `toml:"enable_mem_prealloc"`
+	HugePages                      bool        `toml:"enable_hugepages"`
+	VirtioMem                      bool        `toml:"enable_virtio_mem"`
+	BlockDeviceCacheDirect         bool        `toml:"block_device_cache_direct"`
+	IOMMUPlatform                  bool        `toml:"enable_iommu_platform"`
+	Debug                          bool        `toml:"enable_debug"`
+	DisableNestingChecks           bool        `toml:"disable_nesting_checks"`
+	EnableIOThreads                bool        `toml:"enable_iothreads"`
+	DisableImageNvdimm             bool        `toml:"disable_image_nvdimm"`
+	HotplugVFIOOnRootBus           bool        `toml:"hotplug_vfio_on_root_bus"`
+	BlockDeviceCacheSet            bool        `toml:"block_device_cache_set"`
+	DisableVhostNet                bool        `toml:"disable_vhost_net"`
+	GuestMemoryDumpPaging          bool        `toml:"guest_memory_dump_paging"`
+	ConfidentialGuest              bool        `toml:"confidential_guest"`
+	GuestSwap                      bool        `toml:"enable_guest_swap"`
+	Rootless                       bool        `toml:"rootless"`
+	DisableSeccomp                 bool        `toml:"disable_seccomp"`
+	DisableSeLinux                 bool        `toml:"disable_selinux"`
+	LegacySerial                   bool        `toml:"use_legacy_serial"`
 }
 
 type runtime struct {
@@ -789,7 +791,9 @@ func newQemuHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		Msize9p:                 h.msize9p(),
 		DisableImageNvdimm:      h.DisableImageNvdimm,
 		HotplugVFIOOnRootBus:    h.HotplugVFIOOnRootBus,
+		HotPlugVFIO:             h.HotPlugVFIO,
 		PCIeRootPort:            h.PCIeRootPort,
+		PCIeSwitchPort:          h.PCIeSwitchPort,
 		DisableVhostNet:         h.DisableVhostNet,
 		EnableVhostUserStore:    h.EnableVhostUserStore,
 		VhostUserStorePath:      h.vhostUserStorePath(),
@@ -966,7 +970,9 @@ func newClhHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		EnableIOThreads:                h.EnableIOThreads,
 		Msize9p:                        h.msize9p(),
 		HotplugVFIOOnRootBus:           h.HotplugVFIOOnRootBus,
+		HotPlugVFIO:                    h.HotPlugVFIO,
 		PCIeRootPort:                   h.PCIeRootPort,
+		PCIeSwitchPort:                 h.PCIeSwitchPort,
 		DisableVhostNet:                true,
 		GuestHookPath:                  h.guestHookPath(),
 		VirtioFSExtraArgs:              h.VirtioFSExtraArgs,
@@ -1157,7 +1163,9 @@ func GetDefaultHypervisorConfig() vc.HypervisorConfig {
 		EnableIOThreads:         defaultEnableIOThreads,
 		Msize9p:                 defaultMsize9p,
 		HotplugVFIOOnRootBus:    defaultHotplugVFIOOnRootBus,
+		HotPlugVFIO:             defaultHotPlugVFIO,
 		PCIeRootPort:            defaultPCIeRootPort,
+		PCIeSwitchPort:          defaultPCIeSwitchPort,
 		GuestHookPath:           defaultGuestHookPath,
 		VhostUserStorePath:      defaultVhostUserStorePath,
 		VirtioFSCache:           defaultVirtioFSCacheMode,
