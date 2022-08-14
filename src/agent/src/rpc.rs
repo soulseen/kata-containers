@@ -1210,7 +1210,17 @@ impl protocols::agent_ttrpc::AgentService for AgentService {
             s.running = true;
 
             if !req.guest_hook_path.is_empty() {
-                let _ = s.add_hooks(&req.guest_hook_path).map_err(|e| {
+                // default timeout 10s
+                let mut timeout: i32 = 10;
+
+                // if timeout is set if hook, then use the specified value
+                if let Some(t) = req.guest_hook_timeout {
+                    if t > 0 {
+                        timeout = t as i32;
+                    }
+                }
+
+                let _ = s.add_hooks(&req.guest_hook_path, &timeout).map_err(|e| {
                     error!(
                         sl!(),
                         "add guest hook {} failed: {:?}", req.guest_hook_path, e

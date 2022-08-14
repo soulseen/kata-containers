@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Ant Financial
+// Copyright (c) 2019 Ant Fi&&nancial
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -304,15 +304,15 @@ impl Sandbox {
     }
 
     #[instrument]
-    pub fn add_hooks(&mut self, dir: &str) -> Result<()> {
+    pub fn add_hooks(&mut self, dir: &str, timeout: &i32) -> Result<()> {
         let mut hooks = Hooks::default();
-        if let Ok(hook) = self.find_hooks(dir, "prestart") {
+        if let Ok(hook) = self.find_hooks(dir, "prestart", timeout) {
             hooks.prestart = hook;
         }
-        if let Ok(hook) = self.find_hooks(dir, "poststart") {
+        if let Ok(hook) = self.find_hooks(dir, "poststart", timeout) {
             hooks.poststart = hook;
         }
-        if let Ok(hook) = self.find_hooks(dir, "poststop") {
+        if let Ok(hook) = self.find_hooks(dir, "poststop", timeout) {
             hooks.poststop = hook;
         }
         self.hooks = Some(hooks);
@@ -320,7 +320,7 @@ impl Sandbox {
     }
 
     #[instrument]
-    fn find_hooks(&self, hook_path: &str, hook_type: &str) -> Result<Vec<Hook>> {
+    fn find_hooks(&self, hook_path: &str, hook_type: &str, timeout: &i32) -> Result<Vec<Hook>> {
         let mut hooks = Vec::new();
         for entry in fs::read_dir(Path::new(hook_path).join(hook_type))? {
             let entry = entry?;
@@ -341,6 +341,7 @@ impl Sandbox {
                     .unwrap()
                     .to_owned(),
                 args: vec![name.to_str().unwrap().to_owned(), hook_type.to_owned()],
+                timeout,
                 ..Default::default()
             };
             info!(
@@ -788,7 +789,7 @@ mod tests {
         assert!(file.set_permissions(perm).is_ok());
         assert!(File::create(tmpdir.path().join("poststop").join("poststop.sh")).is_ok());
 
-        assert!(s.add_hooks(tmpdir_path).is_ok());
+        assert!(s.add_hooks(tmpdir_path, *10).is_ok());
         assert!(s.hooks.is_some());
         assert!(s.hooks.as_ref().unwrap().prestart.len() == 1);
         assert!(s.hooks.as_ref().unwrap().poststart.is_empty());
