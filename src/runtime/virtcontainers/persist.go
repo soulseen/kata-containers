@@ -7,7 +7,6 @@ package virtcontainers
 
 import (
 	"errors"
-
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/api"
 	devconfig "github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
 	hv "github.com/kata-containers/kata-containers/src/runtime/pkg/hypervisors"
@@ -252,6 +251,7 @@ func (s *Sandbox) dumpConfig(ss *persistapi.SandboxState) {
 		VhostUserStorePath:      sconfig.HypervisorConfig.VhostUserStorePath,
 		VhostUserStorePathList:  sconfig.HypervisorConfig.VhostUserStorePathList,
 		GuestHookPath:           sconfig.HypervisorConfig.GuestHookPath,
+		GuestHookTimeout:        sconfig.HypervisorConfig.GuestHookTimeout,
 		VMid:                    sconfig.HypervisorConfig.VMid,
 		RxRateLimiterMaxRate:    sconfig.HypervisorConfig.RxRateLimiterMaxRate,
 		TxRateLimiterMaxRate:    sconfig.HypervisorConfig.TxRateLimiterMaxRate,
@@ -491,6 +491,7 @@ func loadSandboxConfig(id string) (*SandboxConfig, error) {
 		VhostUserStorePath:      hconf.VhostUserStorePath,
 		VhostUserStorePathList:  hconf.VhostUserStorePathList,
 		GuestHookPath:           hconf.GuestHookPath,
+		GuestHookTimeout:        hconf.GuestHookTimeout,
 		VMid:                    hconf.VMid,
 		RxRateLimiterMaxRate:    hconf.RxRateLimiterMaxRate,
 		TxRateLimiterMaxRate:    hconf.TxRateLimiterMaxRate,
