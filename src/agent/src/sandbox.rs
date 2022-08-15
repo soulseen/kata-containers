@@ -304,7 +304,7 @@ impl Sandbox {
     }
 
     #[instrument]
-    pub fn add_hooks(&mut self, dir: &str, timeout: &i32) -> Result<()> {
+    pub fn add_hooks(&mut self, dir: &str, timeout: Option<i32>) -> Result<()> {
         let mut hooks = Hooks::default();
         if let Ok(hook) = self.find_hooks(dir, "prestart", timeout) {
             hooks.prestart = hook;
@@ -320,7 +320,12 @@ impl Sandbox {
     }
 
     #[instrument]
-    fn find_hooks(&self, hook_path: &str, hook_type: &str, timeout: &i32) -> Result<Vec<Hook>> {
+    fn find_hooks(
+        &self,
+        hook_path: &str,
+        hook_type: &str,
+        timeout: Option<i32>,
+    ) -> Result<Vec<Hook>> {
         let mut hooks = Vec::new();
         for entry in fs::read_dir(Path::new(hook_path).join(hook_type))? {
             let entry = entry?;
@@ -789,7 +794,8 @@ mod tests {
         assert!(file.set_permissions(perm).is_ok());
         assert!(File::create(tmpdir.path().join("poststop").join("poststop.sh")).is_ok());
 
-        assert!(s.add_hooks(tmpdir_path, *10).is_ok());
+        let timeout: Option<i32> = std::option::Option::Some(10);
+        assert!(s.add_hooks(tmpdir_path, timeout).is_ok());
         assert!(s.hooks.is_some());
         assert!(s.hooks.as_ref().unwrap().prestart.len() == 1);
         assert!(s.hooks.as_ref().unwrap().poststart.is_empty());

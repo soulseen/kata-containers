@@ -1539,7 +1539,15 @@ pub async fn execute_hook(logger: &Logger, h: &Hook, st: &OCIState) -> Result<()
         .stderr(Stdio::piped())
         .spawn()?;
 
-    let timeout: u64 = h.timeout as u64;
+    // default timeout 10s
+    let mut timeout: u64 = 10;
+
+    // if timeout is set if hook, then use the specified value
+    if let Some(t) = h.timeout {
+        if t > 0 {
+            timeout = t as u64;
+        }
+    }
 
     let state = serde_json::to_string(st)?;
     let path = h.path.clone();
