@@ -1174,7 +1174,7 @@ func GetDefaultHypervisorConfig() vc.HypervisorConfig {
 		HotplugVFIOOnRootBus:    defaultHotplugVFIOOnRootBus,
 		PCIeRootPort:            defaultPCIeRootPort,
 		GuestHookPath:           defaultGuestHookPath,
-		GuestHookTimeout:        defaultGuestHooksTimeout,
+		GuestHookTimeout:        defaultGuestHookTimeout,
 		VhostUserStorePath:      defaultVhostUserStorePath,
 		VirtioFSCache:           defaultVirtioFSCacheMode,
 		DisableImageNvdimm:      defaultDisableImageNvdimm,
