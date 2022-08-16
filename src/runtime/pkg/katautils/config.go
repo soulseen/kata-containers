@@ -501,7 +501,7 @@ func (h hypervisor) guestHookPath() string {
 }
 
 func (h hypervisor) guestHookTimeout() int32 {
-	if h.GuestHookPath == "" {
+	if h.GuestHookTimeout <= 0 {
 		return defaultGuestHookTimeout
 	}
 	return h.GuestHookTimeout
