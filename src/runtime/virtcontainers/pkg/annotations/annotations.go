@@ -115,6 +115,9 @@ const (
 	// GuestHookPath is a sandbox annotation to specify the path within the VM that will be used for 'drop-in' hooks.
 	GuestHookPath = kataAnnotHypervisorPrefix + "guest_hook_path"
 
+	// GuestHookTimeout is the number of seconds before aborting the hook, If set, it must be greater than zero.
+	GuestHookTimeout = kataAnnotHypervisorPrefix + "guest_hook_timeout"
+
 	// DisableImageNvdimm is a sandbox annotation to specify use of nvdimm device for guest rootfs image.
 	DisableImageNvdimm = kataAnnotHypervisorPrefix + "disable_image_nvdimm"
 

@@ -21,7 +21,6 @@ import (
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/govmm"
 	govmmQemu "github.com/kata-containers/kata-containers/src/runtime/pkg/govmm/qemu"
-	hv "github.com/kata-containers/kata-containers/src/runtime/pkg/hypervisors"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/oci"
 	vc "github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
@@ -97,6 +96,7 @@ type hypervisor struct {
 	VhostUserStorePath             string      `toml:"vhost_user_store_path"`
 	FileBackedMemRootDir           string      `toml:"file_mem_backend"`
 	GuestHookPath                  string      `toml:"guest_hook_path"`
+	GuestHookTimeout               int32       `toml:"guest_hook_timeout"`
 	GuestMemoryDumpPath            string      `toml:"guest_memory_dump_path"`
 	SeccompSandbox                 string      `toml:"seccompsandbox"`
 	HotPlugVFIO                    hv.PCIePort `toml:"hotplug_vfio"`
@@ -503,6 +503,13 @@ func (h hypervisor) guestHookPath() string {
 	return h.GuestHookPath
 }
 
+func (h hypervisor) guestHookTimeout() int32 {
+	if h.GuestHookTimeout <= 0 {
+		return defaultGuestHookTimeout
+	}
+	return h.GuestHookTimeout
+}
+
 func (h hypervisor) vhostUserStorePath() string {
 	if h.VhostUserStorePath == "" {
 		return defaultVhostUserStorePath
@@ -670,6 +677,7 @@ func newFirecrackerHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		EnableIOThreads:       h.EnableIOThreads,
 		DisableVhostNet:       true, // vhost-net backend is not supported in Firecracker
 		GuestHookPath:         h.guestHookPath(),
+		GuestHookTimeout:      h.guestHookTimeout(),
 		RxRateLimiterMaxRate:  rxRateLimiterMaxRate,
 		TxRateLimiterMaxRate:  txRateLimiterMaxRate,
 		EnableAnnotations:     h.EnableAnnotations,
@@ -803,6 +811,7 @@ func newQemuHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		VhostUserStorePathList:  h.VhostUserStorePathList,
 		SeccompSandbox:          h.SeccompSandbox,
 		GuestHookPath:           h.guestHookPath(),
+		GuestHookTimeout:        h.guestHookTimeout(),
 		RxRateLimiterMaxRate:    rxRateLimiterMaxRate,
 		TxRateLimiterMaxRate:    txRateLimiterMaxRate,
 		EnableAnnotations:       h.EnableAnnotations,
@@ -876,6 +885,7 @@ func newAcrnHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		BlockDeviceDriver:    blockDriver,
 		DisableVhostNet:      h.DisableVhostNet,
 		GuestHookPath:        h.guestHookPath(),
+		GuestHookTimeout:     h.guestHookTimeout(),
 		EnableAnnotations:    h.EnableAnnotations,
 	}, nil
 }
@@ -978,6 +988,7 @@ func newClhHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		PCIeSwitchPort:                 h.PCIeSwitchPort,
 		DisableVhostNet:                true,
 		GuestHookPath:                  h.guestHookPath(),
+		GuestHookTimeout:               h.guestHookTimeout(),
 		VirtioFSExtraArgs:              h.VirtioFSExtraArgs,
 		SGXEPCSize:                     defaultSGXEPCSize,
 		EnableAnnotations:              h.EnableAnnotations,
@@ -1170,6 +1181,7 @@ func GetDefaultHypervisorConfig() vc.HypervisorConfig {
 		PCIeRootPort:            defaultPCIeRootPort,
 		PCIeSwitchPort:          defaultPCIeSwitchPort,
 		GuestHookPath:           defaultGuestHookPath,
+		GuestHookTimeout:        defaultGuestHookTimeout,
 		VhostUserStorePath:      defaultVhostUserStorePath,
 		VirtioFSCache:           defaultVirtioFSCacheMode,
 		DisableImageNvdimm:      defaultDisableImageNvdimm,
