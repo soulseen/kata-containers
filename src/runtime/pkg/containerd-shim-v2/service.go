@@ -378,6 +378,9 @@ func (s *service) Cleanup(ctx context.Context) (_ *taskAPI.DeleteResponse, err e
 // Create a new sandbox or container with the underlying OCI runtime
 func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *taskAPI.CreateTaskResponse, err error) {
 	shimLog.WithField("container", r.ID).Debug("Create() start")
+
+	shimLog.WithField("container", r.ID).Debug("zxy Create: create sandbox")
+
 	defer shimLog.WithField("container", r.ID).Debug("Create() end")
 	start := time.Now()
 	defer func() {
