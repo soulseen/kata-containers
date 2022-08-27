@@ -169,11 +169,12 @@ pub fn baremount(
 
     info!(
         logger,
-        "mount source={:?}, dest={:?}, fs_type={:?}, options={:?}",
+        "baremount source={:?}, dest={:?}, fs_type={:?}, options={:?}, flags={:?}",
         source,
         destination,
         fs_type,
-        options
+        options,
+        flags
     );
 
     nix::mount::mount(
@@ -779,6 +780,14 @@ pub async fn add_storages(
         };
 
         // Todo need to rollback the mounted storage if err met.
+
+        if res.is_err() {
+            error!(
+                logger,
+                "add_storages failed, storage: {:?}, error: {:?} ", storage, res
+            );
+        }
+
         let mount_point = res?;
 
         if !mount_point.is_empty() {
@@ -840,7 +849,8 @@ pub fn get_mount_fs_type_from_file(mount_file: &str, mount_point: &str) -> Resul
         return Err(anyhow!("Invalid mount point {}", mount_point));
     }
 
-    let content = fs::read_to_string(mount_file)?;
+    let content = fs::read_to_string(mount_file)
+        .map_err(|e| anyhow!("read mount file {}: {}", mount_file, e))?;
 
     let re = Regex::new(format!("device .+ mounted on {} with fstype (.+)", mount_point).as_str())?;
 
@@ -1016,8 +1026,6 @@ fn parse_options(option_list: Vec<String>) -> HashMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::test_utils::TestUserType;
-    use crate::{skip_if_not_root, skip_loop_by_user, skip_loop_if_not_root, skip_loop_if_root};
     use protobuf::RepeatedField;
     use protocols::agent::FSGroup;
     use std::fs::File;
@@ -1025,6 +1033,10 @@ mod tests {
     use std::io::Write;
     use std::path::PathBuf;
     use tempfile::tempdir;
+    use test_utils::TestUserType;
+    use test_utils::{
+        skip_if_not_root, skip_loop_by_user, skip_loop_if_not_root, skip_loop_if_root,
+    };
 
     #[test]
     fn test_mount() {

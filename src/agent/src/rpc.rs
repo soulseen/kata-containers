@@ -34,6 +34,7 @@ use protocols::health::{
     HealthCheckResponse, HealthCheckResponse_ServingStatus, VersionCheckResponse,
 };
 use protocols::types::Interface;
+use protocols::{agent_ttrpc_async as agent_ttrpc, health_ttrpc_async as health_ttrpc};
 use rustjail::cgroups::notifier;
 use rustjail::container::{BaseContainer, Container, LinuxContainer};
 use rustjail::process::Process;
@@ -133,30 +134,6 @@ pub struct AgentService {
     sandbox: Arc<Mutex<Sandbox>>,
 }
 
-// A container ID must match this regex:
-//
-//     ^[a-zA-Z0-9][a-zA-Z0-9_.-]+$
-//
-fn verify_cid(id: &str) -> Result<()> {
-    let mut chars = id.chars();
-
-    let valid = match chars.next() {
-        Some(first)
-            if first.is_alphanumeric()
-                && id.len() > 1
-                && chars.all(|c| c.is_alphanumeric() || ['.', '-', '_'].contains(&c)) =>
-        {
-            true
-        }
-        _ => false,
-    };
-
-    match valid {
-        true => Ok(()),
-        false => Err(anyhow!("invalid container ID: {:?}", id)),
-    }
-}
-
 impl AgentService {
     #[instrument]
     async fn do_create_container(
@@ -165,7 +142,7 @@ impl AgentService {
     ) -> Result<()> {
         let cid = req.container_id.clone();
 
-        verify_cid(&cid)?;
+        kata_sys_util::validate::verify_id(&cid)?;
 
         let mut oci_spec = req.OCI.clone();
         let use_sandbox_pidns = req.get_sandbox_pidns();
@@ -249,7 +226,20 @@ impl AgentService {
             info!(sl!(), "no process configurations!");
             return Err(anyhow!(nix::Error::EINVAL));
         };
-        ctr.start(p).await?;
+
+        // if starting container failed, we will do some rollback work
+        // to ensure no resources are leaked.
+        if let Err(err) = ctr.start(p).await {
+            error!(sl!(), "failed to start container: {:?}", err);
+            if let Err(e) = ctr.destroy().await {
+                error!(sl!(), "failed to destroy container: {:?}", e);
+            }
+            if let Err(e) = remove_container_resources(&mut s, &cid) {
+                error!(sl!(), "failed to remove container resources: {:?}", e);
+            }
+            return Err(err);
+        }
+
         s.update_shared_pidns(&ctr)?;
         s.add_container(ctr);
         info!(sl!(), "created container!");
@@ -295,27 +285,6 @@ impl AgentService {
         req: protocols::agent::RemoveContainerRequest,
     ) -> Result<()> {
         let cid = req.container_id.clone();
-        let mut cmounts: Vec<String> = vec![];
-
-        let mut remove_container_resources = |sandbox: &mut Sandbox| -> Result<()> {
-            // Find the sandbox storage used by this container
-            let mounts = sandbox.container_mounts.get(&cid);
-            if let Some(mounts) = mounts {
-                for m in mounts.iter() {
-                    if sandbox.storages.get(m).is_some() {
-                        cmounts.push(m.to_string());
-                    }
-                }
-            }
-
-            for m in cmounts.iter() {
-                sandbox.unset_and_remove_sandbox_storage(m)?;
-            }
-
-            sandbox.container_mounts.remove(cid.as_str());
-            sandbox.containers.remove(cid.as_str());
-            Ok(())
-        };
 
         if req.timeout == 0 {
             let s = Arc::clone(&self.sandbox);
@@ -329,7 +298,7 @@ impl AgentService {
                 .destroy()
                 .await?;
 
-            remove_container_resources(&mut sandbox)?;
+            remove_container_resources(&mut sandbox, &cid)?;
 
             return Ok(());
         }
@@ -361,8 +330,7 @@ impl AgentService {
 
         let s = self.sandbox.clone();
         let mut sandbox = s.lock().await;
-
-        remove_container_resources(&mut sandbox)?;
+        remove_container_resources(&mut sandbox, &cid)?;
 
         Ok(())
     }
@@ -380,7 +348,7 @@ impl AgentService {
         let mut process = req
             .process
             .into_option()
-            .ok_or_else(|| anyhow!(nix::Error::EINVAL))?;
+            .ok_or_else(|| anyhow!("Unable to parse process from ExecProcessRequest"))?;
 
         // Apply any necessary corrections for PCI addresses
         update_env_pci(&mut process.Env, &sandbox.pcimap)?;
@@ -629,7 +597,7 @@ impl AgentService {
         };
 
         if reader.is_none() {
-            return Err(anyhow!(nix::Error::EINVAL));
+            return Err(anyhow!("Unable to determine stream reader, is None"));
         }
 
         let reader = reader.ok_or_else(|| anyhow!("cannot get stream reader"))?;
@@ -650,7 +618,7 @@ impl AgentService {
 }
 
 #[async_trait]
-impl protocols::agent_ttrpc::AgentService for AgentService {
+impl agent_ttrpc::AgentService for AgentService {
     async fn create_container(
         &self,
         ctx: &TtrpcContext,
@@ -1538,7 +1506,7 @@ impl protocols::agent_ttrpc::AgentService for AgentService {
 struct HealthService;
 
 #[async_trait]
-impl protocols::health_ttrpc::Health for HealthService {
+impl health_ttrpc::Health for HealthService {
     async fn check(
         &self,
         _ctx: &TtrpcContext,
@@ -1677,18 +1645,17 @@ async fn read_stream(reader: Arc<Mutex<ReadHalf<PipeStream>>>, l: usize) -> Resu
 }
 
 pub fn start(s: Arc<Mutex<Sandbox>>, server_address: &str) -> Result<TtrpcServer> {
-    let agent_service = Box::new(AgentService { sandbox: s })
-        as Box<dyn protocols::agent_ttrpc::AgentService + Send + Sync>;
+    let agent_service =
+        Box::new(AgentService { sandbox: s }) as Box<dyn agent_ttrpc::AgentService + Send + Sync>;
 
     let agent_worker = Arc::new(agent_service);
 
-    let health_service =
-        Box::new(HealthService {}) as Box<dyn protocols::health_ttrpc::Health + Send + Sync>;
+    let health_service = Box::new(HealthService {}) as Box<dyn health_ttrpc::Health + Send + Sync>;
     let health_worker = Arc::new(health_service);
 
-    let aservice = protocols::agent_ttrpc::create_agent_service(agent_worker);
+    let aservice = agent_ttrpc::create_agent_service(agent_worker);
 
-    let hservice = protocols::health_ttrpc::create_health(health_worker);
+    let hservice = health_ttrpc::create_health(health_worker);
 
     let server = TtrpcServer::new()
         .bind(server_address)?
@@ -1751,6 +1718,35 @@ fn update_container_namespaces(
     }
 
     linux.namespaces.push(pid_ns);
+    Ok(())
+}
+
+fn remove_container_resources(sandbox: &mut Sandbox, cid: &str) -> Result<()> {
+    let mut cmounts: Vec<String> = vec![];
+
+    // Find the sandbox storage used by this container
+    let mounts = sandbox.container_mounts.get(cid);
+    if let Some(mounts) = mounts {
+        for m in mounts.iter() {
+            if sandbox.storages.get(m).is_some() {
+                cmounts.push(m.to_string());
+            }
+        }
+    }
+
+    for m in cmounts.iter() {
+        if let Err(err) = sandbox.unset_and_remove_sandbox_storage(m) {
+            error!(
+                sl!(),
+                "failed to unset_and_remove_sandbox_storage for container {}, error: {:?}",
+                cid,
+                err
+            );
+        }
+    }
+
+    sandbox.container_mounts.remove(cid);
+    sandbox.containers.remove(cid);
     Ok(())
 }
 
@@ -1845,7 +1841,11 @@ fn do_copy_file(req: &CopyFileRequest) -> Result<()> {
     let path = PathBuf::from(req.path.as_str());
 
     if !path.starts_with(CONTAINER_BASE) {
-        return Err(anyhow!(nix::Error::EINVAL));
+        return Err(anyhow!(
+            "Path {:?} does not start with {}",
+            path,
+            CONTAINER_BASE
+        ));
     }
 
     let parent = path.parent();
@@ -2013,14 +2013,12 @@ fn load_kernel_module(module: &protocols::agent::KernelModule) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        assert_result, namespace::Namespace, protocols::agent_ttrpc::AgentService as _,
-        skip_if_not_root,
-    };
+    use crate::{namespace::Namespace, protocols::agent_ttrpc_async::AgentService as _};
     use nix::mount;
     use nix::sched::{unshare, CloneFlags};
     use oci::{Hook, Hooks, Linux, LinuxNamespace};
     use tempfile::{tempdir, TempDir};
+    use test_utils::{assert_result, skip_if_not_root};
     use ttrpc::{r#async::TtrpcContext, MessageHeader};
 
     fn mk_ttrpc_context() -> TtrpcContext {
@@ -2086,6 +2084,7 @@ mod tests {
         let result = load_kernel_module(&m);
         assert!(result.is_err(), "load module should failed");
 
+        skip_if_not_root!();
         // case 3: normal module.
         // normally this module should eixsts...
         m.name = "bridge".to_string();
@@ -2264,6 +2263,7 @@ mod tests {
                     if d.has_fd {
                         Some(wfd)
                     } else {
+                        unistd::close(wfd).unwrap();
                         None
                     }
                 };
@@ -2298,13 +2298,14 @@ mod tests {
             if !d.break_pipe {
                 unistd::close(rfd).unwrap();
             }
-            unistd::close(wfd).unwrap();
+            // XXX: Do not close wfd.
+            // the fd will be closed on Process's dropping.
+            // unistd::close(wfd).unwrap();
 
             let msg = format!("{}, result: {:?}", msg, result);
             assert_result!(d.result, result, msg);
         }
     }
-
     #[tokio::test]
     async fn test_update_container_namespaces() {
         #[derive(Debug)]
@@ -2669,233 +2670,6 @@ OtherField:other
             let msg = format!("{}, result: {:?}", msg, result);
 
             assert_eq!(d.result, result, "{}", msg);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_verify_cid() {
-        #[derive(Debug)]
-        struct TestData<'a> {
-            id: &'a str,
-            expect_error: bool,
-        }
-
-        let tests = &[
-            TestData {
-                // Cannot be blank
-                id: "",
-                expect_error: true,
-            },
-            TestData {
-                // Cannot be a space
-                id: " ",
-                expect_error: true,
-            },
-            TestData {
-                // Must start with an alphanumeric
-                id: ".",
-                expect_error: true,
-            },
-            TestData {
-                // Must start with an alphanumeric
-                id: "-",
-                expect_error: true,
-            },
-            TestData {
-                // Must start with an alphanumeric
-                id: "_",
-                expect_error: true,
-            },
-            TestData {
-                // Must start with an alphanumeric
-                id: " a",
-                expect_error: true,
-            },
-            TestData {
-                // Must start with an alphanumeric
-                id: ".a",
-                expect_error: true,
-            },
-            TestData {
-                // Must start with an alphanumeric
-                id: "-a",
-                expect_error: true,
-            },
-            TestData {
-                // Must start with an alphanumeric
-                id: "_a",
-                expect_error: true,
-            },
-            TestData {
-                // Must start with an alphanumeric
-                id: "..",
-                expect_error: true,
-            },
-            TestData {
-                // Too short
-                id: "a",
-                expect_error: true,
-            },
-            TestData {
-                // Too short
-                id: "z",
-                expect_error: true,
-            },
-            TestData {
-                // Too short
-                id: "A",
-                expect_error: true,
-            },
-            TestData {
-                // Too short
-                id: "Z",
-                expect_error: true,
-            },
-            TestData {
-                // Too short
-                id: "0",
-                expect_error: true,
-            },
-            TestData {
-                // Too short
-                id: "9",
-                expect_error: true,
-            },
-            TestData {
-                // Must start with an alphanumeric
-                id: "-1",
-                expect_error: true,
-            },
-            TestData {
-                id: "/",
-                expect_error: true,
-            },
-            TestData {
-                id: "a/",
-                expect_error: true,
-            },
-            TestData {
-                id: "a/../",
-                expect_error: true,
-            },
-            TestData {
-                id: "../a",
-                expect_error: true,
-            },
-            TestData {
-                id: "../../a",
-                expect_error: true,
-            },
-            TestData {
-                id: "../../../a",
-                expect_error: true,
-            },
-            TestData {
-                id: "foo/../bar",
-                expect_error: true,
-            },
-            TestData {
-                id: "foo bar",
-                expect_error: true,
-            },
-            TestData {
-                id: "a.",
-                expect_error: false,
-            },
-            TestData {
-                id: "a..",
-                expect_error: false,
-            },
-            TestData {
-                id: "aa",
-                expect_error: false,
-            },
-            TestData {
-                id: "aa.",
-                expect_error: false,
-            },
-            TestData {
-                id: "hello..world",
-                expect_error: false,
-            },
-            TestData {
-                id: "hello/../world",
-                expect_error: true,
-            },
-            TestData {
-                id: "aa1245124sadfasdfgasdga.",
-                expect_error: false,
-            },
-            TestData {
-                id: "aAzZ0123456789_.-",
-                expect_error: false,
-            },
-            TestData {
-                id: "abcdefghijklmnopqrstuvwxyz0123456789.-_",
-                expect_error: false,
-            },
-            TestData {
-                id: "0123456789abcdefghijklmnopqrstuvwxyz.-_",
-                expect_error: false,
-            },
-            TestData {
-                id: " abcdefghijklmnopqrstuvwxyz0123456789.-_",
-                expect_error: true,
-            },
-            TestData {
-                id: ".abcdefghijklmnopqrstuvwxyz0123456789.-_",
-                expect_error: true,
-            },
-            TestData {
-                id: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_",
-                expect_error: false,
-            },
-            TestData {
-                id: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ.-_",
-                expect_error: false,
-            },
-            TestData {
-                id: " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_",
-                expect_error: true,
-            },
-            TestData {
-                id: ".ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_",
-                expect_error: true,
-            },
-            TestData {
-                id: "/a/b/c",
-                expect_error: true,
-            },
-            TestData {
-                id: "a/b/c",
-                expect_error: true,
-            },
-            TestData {
-                id: "foo/../../../etc/passwd",
-                expect_error: true,
-            },
-            TestData {
-                id: "../../../../../../etc/motd",
-                expect_error: true,
-            },
-            TestData {
-                id: "/etc/passwd",
-                expect_error: true,
-            },
-        ];
-
-        for (i, d) in tests.iter().enumerate() {
-            let msg = format!("test[{}]: {:?}", i, d);
-
-            let result = verify_cid(d.id);
-
-            let msg = format!("{}, result: {:?}", msg, result);
-
-            if result.is_ok() {
-                assert!(!d.expect_error, "{}", msg);
-            } else {
-                assert!(d.expect_error, "{}", msg);
-            }
         }
     }
 

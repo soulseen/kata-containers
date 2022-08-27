@@ -3,11 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use crate::status::Status;
+use crate::cgroup::{freeze, remove_cgroup_dir};
+use crate::status::{self, get_current_container_state, Status};
 use anyhow::{anyhow, Result};
-use nix::unistd::{chdir, unlink};
+use cgroups;
+use cgroups::freezer::FreezerState;
+use cgroups::hierarchies::is_cgroup2_unified_mode;
+use nix::sys::signal::kill;
+use nix::{
+    sys::signal::Signal,
+    sys::signal::SIGKILL,
+    unistd::{chdir, unlink, Pid},
+};
+use oci::{ContainerState, State as OCIState};
+use procfs;
 use rustjail::{
-    container::{BaseContainer, LinuxContainer, EXEC_FIFO_FILENAME},
+    container::{self, BaseContainer, LinuxContainer, EXEC_FIFO_FILENAME},
     process::{Process, ProcessOperations},
 };
 use scopeguard::defer;
@@ -24,6 +35,166 @@ pub const CONFIG_FILE_NAME: &str = "config.json";
 pub enum ContainerAction {
     Create,
     Run,
+}
+
+#[derive(Debug)]
+pub struct Container {
+    pub status: Status,
+    pub state: ContainerState,
+    pub cgroup: cgroups::Cgroup,
+}
+
+// Container represents a container that is created by the container runtime.
+impl Container {
+    pub fn load(state_root: &Path, id: &str) -> Result<Self> {
+        let status = Status::load(state_root, id)?;
+        let spec = status
+            .config
+            .spec
+            .as_ref()
+            .ok_or_else(|| anyhow!("spec config was not present"))?;
+        let linux = spec
+            .linux
+            .as_ref()
+            .ok_or_else(|| anyhow!("linux config was not present"))?;
+        let cpath = if linux.cgroups_path.is_empty() {
+            id.to_string()
+        } else {
+            linux
+                .cgroups_path
+                .clone()
+                .trim_start_matches('/')
+                .to_string()
+        };
+        let cgroup = cgroups::Cgroup::load(cgroups::hierarchies::auto(), cpath);
+        let state = get_current_container_state(&status, &cgroup)?;
+        Ok(Self {
+            status,
+            state,
+            cgroup,
+        })
+    }
+
+    pub fn processes(&self) -> Result<Vec<Pid>> {
+        let pids = self.cgroup.tasks();
+        let result = pids.iter().map(|x| Pid::from_raw(x.pid as i32)).collect();
+        Ok(result)
+    }
+
+    pub fn kill(&self, signal: Signal, all: bool) -> Result<()> {
+        if self.state == ContainerState::Stopped {
+            return Err(anyhow!(
+                "container {} can't be killed because it is {:?}",
+                self.status.id,
+                self.state
+            ));
+        }
+
+        if all {
+            let pids = self.processes()?;
+            for pid in pids {
+                if !status::is_process_running(pid)? {
+                    continue;
+                }
+                kill(pid, signal)?;
+            }
+        } else {
+            let pid = Pid::from_raw(self.status.pid);
+            if status::is_process_running(pid)? {
+                kill(pid, signal)?;
+            }
+        }
+        // For cgroup v1, killing a process in a frozen cgroup does nothing until it's thawed.
+        // Only thaw the cgroup for SIGKILL.
+        // Ref: https://github.com/opencontainers/runc/pull/3217
+        if !is_cgroup2_unified_mode() && self.state == ContainerState::Paused && signal == SIGKILL {
+            freeze(&self.cgroup, FreezerState::Thawed)?;
+        }
+        Ok(())
+    }
+
+    pub async fn delete(&self, force: bool, logger: &Logger) -> Result<()> {
+        let status = &self.status;
+        let spec = status
+            .config
+            .spec
+            .as_ref()
+            .ok_or_else(|| anyhow!("spec config was not present in the status"))?;
+
+        let oci_state = OCIState {
+            version: status.oci_version.clone(),
+            id: status.id.clone(),
+            status: self.state,
+            pid: status.pid,
+            bundle: status
+                .bundle
+                .to_str()
+                .ok_or_else(|| anyhow!("invalid bundle path"))?
+                .to_string(),
+            annotations: spec.annotations.clone(),
+        };
+
+        if spec.hooks.is_some() {
+            let hooks = spec
+                .hooks
+                .as_ref()
+                .ok_or_else(|| anyhow!("hooks config was not present"))?;
+            for h in hooks.poststop.iter() {
+                container::execute_hook(logger, h, &oci_state).await?;
+            }
+        }
+
+        match oci_state.status {
+            ContainerState::Stopped => {
+                self.destroy()?;
+            }
+            ContainerState::Created => {
+                // Kill an init process
+                self.kill(SIGKILL, false)?;
+                self.destroy()?;
+            }
+            _ => {
+                if force {
+                    self.kill(SIGKILL, true)?;
+                    self.destroy()?;
+                } else {
+                    return Err(anyhow!(
+                        "cannot delete container {} that is not stopped",
+                        &status.id
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn pause(&self) -> Result<()> {
+        if self.state != ContainerState::Running && self.state != ContainerState::Created {
+            return Err(anyhow!(
+                "failed to pause container: current status is: {:?}",
+                self.state
+            ));
+        }
+        freeze(&self.cgroup, FreezerState::Frozen)?;
+        Ok(())
+    }
+
+    pub fn resume(&self) -> Result<()> {
+        if self.state != ContainerState::Paused {
+            return Err(anyhow!(
+                "failed to resume container: current status is: {:?}",
+                self.state
+            ));
+        }
+        freeze(&self.cgroup, FreezerState::Thawed)?;
+        Ok(())
+    }
+
+    pub fn destroy(&self) -> Result<()> {
+        remove_cgroup_dir(&self.cgroup)?;
+        self.status.remove_dir()
+    }
 }
 
 /// Used to run a process. If init is set, it will create a container and run the process in it.
@@ -144,11 +315,14 @@ impl ContainerLauncher {
     /// Generate runk specified Status
     fn get_status(&self) -> Result<Status> {
         let oci_state = self.runner.oci_state()?;
+        // read start time from /proc/<pid>/stat
+        let proc = procfs::process::Process::new(self.runner.init_process_pid)?;
+        let process_start_time = proc.stat()?.starttime;
         Status::new(
             &self.state_root,
             &self.bundle,
             oci_state,
-            self.runner.init_process_start_time,
+            process_start_time,
             self.runner.created,
             self.runner
                 .cgroup_manager

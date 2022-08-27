@@ -79,6 +79,7 @@ func createAllRuntimeConfigFiles(dir, hypervisor string) (config testRuntimeConf
 	machineType := "machineType"
 	disableBlockDevice := true
 	blockDeviceDriver := "virtio-scsi"
+	blockDeviceAIO := "io_uring"
 	enableIOThreads := true
 	hotplugVFIOOnRootBus := true
 	pcieRootPort := uint32(2)
@@ -100,6 +101,7 @@ func createAllRuntimeConfigFiles(dir, hypervisor string) (config testRuntimeConf
 		DefaultGuestHookTimeout: defaultGuestHookTimeout,
 		DisableBlock:            disableBlockDevice,
 		BlockDeviceDriver:       blockDeviceDriver,
+		BlockDeviceAIO:          blockDeviceAIO,
 		EnableIOThreads:         enableIOThreads,
 		HotplugVFIOOnRootBus:    hotplugVFIOOnRootBus,
 		PCIeRootPort:            pcieRootPort,
@@ -160,6 +162,7 @@ func createAllRuntimeConfigFiles(dir, hypervisor string) (config testRuntimeConf
 		DefaultMaxMemorySize:  maxMemory,
 		DisableBlockDeviceUse: disableBlockDevice,
 		BlockDeviceDriver:     defaultBlockDeviceDriver,
+		BlockDeviceAIO:        defaultBlockDeviceAIO,
 		DefaultBridges:        defaultBridgesCount,
 		EnableIOThreads:       enableIOThreads,
 		HotplugVFIOOnRootBus:  hotplugVFIOOnRootBus,
@@ -553,6 +556,7 @@ func TestMinimalRuntimeConfig(t *testing.T) {
 		GuestHookTimeout:      defaultGuestHookTimeout,
 		VhostUserStorePath:    defaultVhostUserStorePath,
 		VirtioFSCache:         defaultVirtioFSCacheMode,
+		BlockDeviceAIO:        defaultBlockDeviceAIO,
 	}
 
 	expectedAgentConfig := vc.KataAgentConfig{
@@ -596,6 +600,7 @@ func TestNewQemuHypervisorConfig(t *testing.T) {
 	hotplugVFIOOnRootBus := true
 	pcieRootPort := uint32(2)
 	orgVHostVSockDevicePath := utils.VHostVSockDevicePath
+	blockDeviceAIO := "io_uring"
 	defer func() {
 		utils.VHostVSockDevicePath = orgVHostVSockDevicePath
 	}()
@@ -617,6 +622,7 @@ func TestNewQemuHypervisorConfig(t *testing.T) {
 		TxRateLimiterMaxRate:  txRateLimiterMaxRate,
 		SharedFS:              "virtio-fs",
 		VirtioFSDaemon:        filepath.Join(dir, "virtiofsd"),
+		BlockDeviceAIO:        blockDeviceAIO,
 	}
 
 	files := []string{hypervisorPath, kernelPath, imagePath}
@@ -677,6 +683,11 @@ func TestNewQemuHypervisorConfig(t *testing.T) {
 	if config.TxRateLimiterMaxRate != txRateLimiterMaxRate {
 		t.Errorf("Expected value for tx rate limiter %v, got %v", txRateLimiterMaxRate, config.TxRateLimiterMaxRate)
 	}
+
+	if config.BlockDeviceAIO != blockDeviceAIO {
+		t.Errorf("Expected value for BlockDeviceAIO  %v, got %v", blockDeviceAIO, config.BlockDeviceAIO)
+	}
+
 }
 
 func TestNewFirecrackerHypervisorConfig(t *testing.T) {

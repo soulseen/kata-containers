@@ -46,6 +46,9 @@ const (
 	// ClhHypervisor is the ICH hypervisor.
 	ClhHypervisor HypervisorType = "clh"
 
+	// DragonballHypervisor is the Dragonball hypervisor.
+	DragonballHypervisor HypervisorType = "dragonball"
+
 	// MockHypervisor is a mock hypervisor for testing purposes
 	MockHypervisor HypervisorType = "mock"
 
@@ -168,6 +171,9 @@ func (hType *HypervisorType) Set(value string) error {
 		return nil
 	case "clh":
 		*hType = ClhHypervisor
+		return nil
+	case "dragonball":
+		*hType = DragonballHypervisor
 		return nil
 	case "mock":
 		*hType = MockHypervisor
@@ -373,6 +379,9 @@ type HypervisorConfig struct {
 
 	// SeccompSandbox is the qemu function which enables the seccomp feature
 	SeccompSandbox string
+
+	// BlockiDeviceAIO specifies the I/O API to be used.
+	BlockDeviceAIO string
 
 	// KernelParams are additional guest kernel parameters.
 	KernelParams []Param

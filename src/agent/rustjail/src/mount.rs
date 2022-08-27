@@ -780,18 +780,31 @@ fn mount_from(
             Path::new(&dest).parent().unwrap()
         };
 
-        let _ = fs::create_dir_all(&dir).map_err(|e| {
+        fs::create_dir_all(&dir).map_err(|e| {
             log_child!(
                 cfd_log,
                 "create dir {}: {}",
                 dir.to_str().unwrap(),
                 e.to_string()
-            )
-        });
+            );
+            e
+        })?;
 
         // make sure file exists so we can bind over it
         if !src.is_dir() {
-            let _ = OpenOptions::new().create(true).write(true).open(&dest);
+            let _ = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&dest)
+                .map_err(|e| {
+                    log_child!(
+                        cfd_log,
+                        "open/create dest error. {}: {:?}",
+                        dest.as_str(),
+                        e
+                    );
+                    e
+                })?;
         }
         src.to_str().unwrap().to_string()
     } else {
@@ -804,8 +817,10 @@ fn mount_from(
         }
     };
 
-    let _ = stat::stat(dest.as_str())
-        .map_err(|e| log_child!(cfd_log, "dest stat error. {}: {:?}", dest.as_str(), e));
+    let _ = stat::stat(dest.as_str()).map_err(|e| {
+        log_child!(cfd_log, "dest stat error. {}: {:?}", dest.as_str(), e);
+        e
+    })?;
 
     mount(
         Some(src.as_str()),
@@ -1005,9 +1020,7 @@ pub fn finish_rootfs(cfd_log: RawFd, spec: &Spec, process: &Process) -> Result<(
 }
 
 fn mask_path(path: &str) -> Result<()> {
-    if !path.starts_with('/') || path.contains("..") {
-        return Err(anyhow!(nix::Error::EINVAL));
-    }
+    check_paths(path)?;
 
     match mount(
         Some("/dev/null"),
@@ -1025,9 +1038,7 @@ fn mask_path(path: &str) -> Result<()> {
 }
 
 fn readonly_path(path: &str) -> Result<()> {
-    if !path.starts_with('/') || path.contains("..") {
-        return Err(anyhow!(nix::Error::EINVAL));
-    }
+    check_paths(path)?;
 
     if let Err(e) = mount(
         Some(&path[1..]),
@@ -1053,11 +1064,20 @@ fn readonly_path(path: &str) -> Result<()> {
     Ok(())
 }
 
+fn check_paths(path: &str) -> Result<()> {
+    if !path.starts_with('/') || path.contains("..") {
+        return Err(anyhow!(
+            "Cannot mount {} (path does not start with '/' or contains '..').",
+            path
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::assert_result;
-    use crate::skip_if_not_root;
     use std::fs::create_dir;
     use std::fs::create_dir_all;
     use std::fs::remove_dir_all;
@@ -1065,6 +1085,7 @@ mod tests {
     use std::os::unix::fs;
     use std::os::unix::io::AsRawFd;
     use tempfile::tempdir;
+    use test_utils::skip_if_not_root;
 
     #[test]
     #[serial(chdir)]
@@ -1402,6 +1423,55 @@ mod tests {
                 let error_msg = format!("{}", result.unwrap_err());
                 assert!(error_msg.contains(d.error_contains), "{}", msg);
             }
+        }
+    }
+
+    #[test]
+    fn test_check_paths() {
+        #[derive(Debug)]
+        struct TestData<'a> {
+            name: &'a str,
+            path: &'a str,
+            result: Result<()>,
+        }
+
+        let tests = &[
+            TestData {
+                name: "valid path",
+                path: "/foo/bar",
+                result: Ok(()),
+            },
+            TestData {
+                name: "does not starts with /",
+                path: "foo/bar",
+                result: Err(anyhow!(
+                    "Cannot mount foo/bar (path does not start with '/' or contains '..')."
+                )),
+            },
+            TestData {
+                name: "contains ..",
+                path: "../foo/bar",
+                result: Err(anyhow!(
+                    "Cannot mount ../foo/bar (path does not start with '/' or contains '..')."
+                )),
+            },
+        ];
+
+        for (i, d) in tests.iter().enumerate() {
+            let msg = format!("test[{}]: {:?}", i, d.name);
+
+            let result = check_paths(d.path);
+
+            let msg = format!("{}: result: {:?}", msg, result);
+
+            if d.result.is_ok() {
+                assert!(result.is_ok());
+                continue;
+            }
+
+            let expected_error = format!("{}", d.result.as_ref().unwrap_err());
+            let actual_error = format!("{}", result.unwrap_err());
+            assert!(actual_error == expected_error, "{}", msg);
         }
     }
 

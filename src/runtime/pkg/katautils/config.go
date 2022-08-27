@@ -51,6 +51,7 @@ const (
 	clhHypervisorTableType         = "clh"
 	qemuHypervisorTableType        = "qemu"
 	acrnHypervisorTableType        = "acrn"
+	dragonballHypervisorTableType  = "dragonball"
 
 	// the maximum amount of PCI bridges that can be cold plugged in a VM
 	maxPCIBridges uint32 = 5
@@ -100,6 +101,7 @@ type hypervisor struct {
 	GuestHookTimeout               int32    `toml:"guest_hook_timeout"`
 	GuestMemoryDumpPath            string   `toml:"guest_memory_dump_path"`
 	SeccompSandbox                 string   `toml:"seccompsandbox"`
+	BlockDeviceAIO                 string   `toml:"block_device_aio"`
 	HypervisorPathList             []string `toml:"valid_hypervisor_paths"`
 	JailerPathList                 []string `toml:"valid_jailer_paths"`
 	CtlPathList                    []string `toml:"valid_ctlpaths"`
@@ -469,6 +471,22 @@ func (h hypervisor) blockDeviceDriver() (string, error) {
 	return "", fmt.Errorf("Invalid hypervisor block storage driver %v specified (supported drivers: %v)", h.BlockDeviceDriver, supportedBlockDrivers)
 }
 
+func (h hypervisor) blockDeviceAIO() (string, error) {
+	supportedBlockAIO := []string{config.AIOIOUring, config.AIONative, config.AIOThreads}
+
+	if h.BlockDeviceAIO == "" {
+		return defaultBlockDeviceAIO, nil
+	}
+
+	for _, b := range supportedBlockAIO {
+		if b == h.BlockDeviceAIO {
+			return h.BlockDeviceAIO, nil
+		}
+	}
+
+	return "", fmt.Errorf("Invalid hypervisor block storage I/O mechanism  %v specified (supported AIO: %v)", h.BlockDeviceAIO, supportedBlockAIO)
+}
+
 func (h hypervisor) sharedFS() (string, error) {
 	supportedSharedFS := []string{config.Virtio9P, config.VirtioFS, config.VirtioFSNydus}
 
@@ -736,6 +754,11 @@ func newQemuHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		return vc.HypervisorConfig{}, err
 	}
 
+	blockAIO, err := h.blockDeviceAIO()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
 	sharedFS, err := h.sharedFS()
 	if err != nil {
 		return vc.HypervisorConfig{}, err
@@ -792,6 +815,7 @@ func newQemuHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		Debug:                   h.Debug,
 		DisableNestingChecks:    h.DisableNestingChecks,
 		BlockDeviceDriver:       blockDriver,
+		BlockDeviceAIO:          blockAIO,
 		BlockDeviceCacheSet:     h.BlockDeviceCacheSet,
 		BlockDeviceCacheDirect:  h.BlockDeviceCacheDirect,
 		BlockDeviceCacheNoflush: h.BlockDeviceCacheNoflush,
@@ -1001,6 +1025,30 @@ func newClhHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 	}, nil
 }
 
+func newDragonballHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
+	kernel, err := h.kernel()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+	image, err := h.image()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+	kernelParams := h.kernelParams()
+
+	return vc.HypervisorConfig{
+		KernelPath:      kernel,
+		ImagePath:       image,
+		KernelParams:    vc.DeserializeParams(strings.Fields(kernelParams)),
+		NumVCPUs:        h.defaultVCPUs(),
+		DefaultMaxVCPUs: h.defaultMaxVCPUs(),
+		MemorySize:      h.defaultMemSz(),
+		MemSlots:        h.defaultMemSlots(),
+		EntropySource:   h.GetEntropySource(),
+		Debug:           h.Debug,
+	}, nil
+}
+
 func newFactoryConfig(f factory) (oci.FactoryConfig, error) {
 	if f.TemplatePath == "" {
 		f.TemplatePath = defaultTemplatePath
@@ -1034,6 +1082,9 @@ func updateRuntimeConfigHypervisor(configPath string, tomlConf tomlConfig, confi
 		case clhHypervisorTableType:
 			config.HypervisorType = vc.ClhHypervisor
 			hConfig, err = newClhHypervisorConfig(hypervisor)
+		case dragonballHypervisorTableType:
+			config.HypervisorType = vc.DragonballHypervisor
+			hConfig, err = newDragonballHypervisorConfig(hypervisor)
 		}
 
 		if err != nil {
@@ -1166,6 +1217,7 @@ func GetDefaultHypervisorConfig() vc.HypervisorConfig {
 		Debug:                   defaultEnableDebug,
 		DisableNestingChecks:    defaultDisableNestingChecks,
 		BlockDeviceDriver:       defaultBlockDeviceDriver,
+		BlockDeviceAIO:          defaultBlockDeviceAIO,
 		BlockDeviceCacheSet:     defaultBlockDeviceCacheSet,
 		BlockDeviceCacheDirect:  defaultBlockDeviceCacheDirect,
 		BlockDeviceCacheNoflush: defaultBlockDeviceCacheNoflush,
