@@ -382,7 +382,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 
 	j, _ := json.Marshal(r)
 	shimLog.Warn("goodluckzxy")
-	shimLog.Warn(j)
+	shimLog.Warn(string(j))
 
 	defer shimLog.WithField("container", r.ID).Debug("Create() end")
 	start := time.Now()
