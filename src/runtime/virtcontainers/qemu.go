@@ -710,12 +710,12 @@ func (q *qemu) getCliqueIDs() map[string]hotplugInfo {
 		info     = make(map[string]hotplugInfo)
 	)
 	if len(devices) == 0 {
-		q.Logger().Warnf("zxy No CDI devices found")
+		q.Logger().Warningf("zxy No CDI devices found")
 		return nil
 	}
 
 	for _, device := range devices {
-		q.Logger().Warnf("zxy CDI devices found: %s", device)
+		q.Logger().Warningf("zxy CDI devices found: %s", device)
 		dev := registry.DeviceDB().GetDevice(device)
 
 		var (
