@@ -709,13 +709,17 @@ func (q *qemu) getCliqueIDs() map[string]hotplugInfo {
 		devices  = registry.DeviceDB().ListDevices()
 		info     = make(map[string]hotplugInfo)
 	)
+	var shimLog = logrus.WithFields(logrus.Fields{
+		"source": "containerd-kata-shim-v2",
+		"name":   "containerd-shim-v2",
+	})
 	if len(devices) == 0 {
-		q.Logger().Warningf("zxy No CDI devices found")
+		shimLog.Warn("zxy No CDI devices found")
 		return nil
 	}
 
 	for _, device := range devices {
-		q.Logger().Warningf("zxy CDI devices found: %s", device)
+		shimLog.Warnf("zxy CDI devices found: %s", device)
 		dev := registry.DeviceDB().GetDevice(device)
 
 		var (
@@ -760,6 +764,11 @@ func (q *qemu) getCliqueIDs() map[string]hotplugInfo {
 // There is only 64kB of IO memory each root,switch port will consume 4k hence
 // only 16 ports possible.
 func (q *qemu) createPCIeTopology(qemuConfig *govmmQemu.Config, hypervisorConfig *HypervisorConfig) error {
+	var shimLog = logrus.WithFields(logrus.Fields{
+		"source": "containerd-kata-shim-v2",
+		"name":   "containerd-shim-v2",
+	})
+	shimLog.Warn("zxy createPCIeTopology")
 	// We do not need to do anything if we want to hotplug a VFIO to a
 	// pcie-pci-bridge, just return
 	//if hypervisorConfig.HotPlugVFIO == hv.BridgePort {
