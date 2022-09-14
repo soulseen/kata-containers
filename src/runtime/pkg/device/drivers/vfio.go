@@ -67,11 +67,14 @@ func getAttachAffinity() map[string]hotplugInfo {
 		info     = make(map[string]hotplugInfo)
 	)
 	if len(devices) == 0 {
+		deviceLogger().WithField("cold-plug", "zzzzz").Info("zzzzz getAttachAffinity No CDI devices found")
 		return nil
 	}
 
 	for _, device := range devices {
 		dev := registry.DeviceDB().GetDevice(device)
+
+		deviceLogger().WithField("cold-plug", "zzzzz").Info("zzzzz getAttachAffinity device", dev.Annotations["bdf"])
 
 		var (
 			bdf string
@@ -140,6 +143,11 @@ func (device *VFIODevice) Attach(ctx context.Context, devReceiver api.DeviceRece
 		}
 
 		attachToPCI := info[deviceBDF].attachToPCI
+		//var attachToPCI bool
+		//attachToPCI = info[deviceBDF].attachToPCI
+		//if hotPlugInfo, ok := info[deviceBDF]; ok {
+		//	// TODO zxy
+		//}
 
 		vfio := &config.VFIODev{
 			ID:       utils.MakeNameID("vfio", device.DeviceInfo.ID+strconv.Itoa(i), maxDevIDSize),
