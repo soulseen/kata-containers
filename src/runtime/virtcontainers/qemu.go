@@ -498,7 +498,7 @@ func (q *qemu) createVirtiofsDaemon(sharedPath string) (VirtiofsDaemon, error) {
 func (q *qemu) CreateVM(ctx context.Context, id string, network Network, hypervisorConfig *HypervisorConfig) error {
 	// Save the tracing context
 	q.ctx = ctx
-
+	q.Logger().Warn("zxy CreateVM")
 	span, ctx := katatrace.Trace(ctx, q.Logger(), "CreateVM", qemuTracingTags, map[string]string{"VM_ID": q.id})
 	defer span.End()
 
@@ -850,9 +850,10 @@ func (q *qemu) createPCIeTopology(qemuConfig *govmmQemu.Config, hypervisorConfig
 
 	if q.state.HotPlugVFIO == hv.RootPort {
 		qemuConfig.Devices = q.arch.appendPCIeRootPortDevice(qemuConfig.Devices, numOfPCIeHotPlugPorts, memSize32bit, memSize64bit)
-		if numOfPCIHotPlugPorts > 0 {
-			qemuConfig.Devices = q.arch.appendPCIBridgePortDevice(qemuConfig.Devices, numOfPCIHotPlugPorts)
-		}
+		qemuConfig.Devices = q.arch.appendPCIBridgePortDevice(qemuConfig.Devices, numOfPCIHotPlugPorts)
+		//if numOfPCIHotPlugPorts > 0 {
+		//	qemuConfig.Devices = q.arch.appendPCIBridgePortDevice(qemuConfig.Devices, numOfPCIHotPlugPorts)
+		//}
 	}
 
 	if q.state.HotPlugVFIO == hv.SwitchPort {
