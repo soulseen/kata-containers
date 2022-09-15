@@ -532,7 +532,6 @@ func newSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factor
 		swapSizeBytes:   0,
 		swapDevices:     []*config.BlockDrive{},
 	}
-	s.Logger().Warn("zxy newSandbox")
 
 	fsShare, err := NewFilesystemShare(s)
 	if err != nil {

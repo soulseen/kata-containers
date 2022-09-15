@@ -381,7 +381,6 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	shimLog.WithField("container", r.ID).Debug("Create() start")
 
 	j, _ := json.Marshal(r)
-	shimLog.Warn("goodluckzxy")
 	shimLog.Warn(string(j))
 
 	defer shimLog.WithField("container", r.ID).Debug("Create() end")

@@ -51,12 +51,6 @@ var defaultStartManagementServerFunc startManagementServerFunc = func(s *service
 func withCDI(annotations map[string]string, cdiSpecDirs []string, s *specs.Spec) ([]*cdi.Device, error) {
 	// TODO: Once CRI is extended with native CDI support this will need to be updated...
 
-	shimLog.Warn("zxy withCDI print oci anno")
-	for key, value := range annotations {
-		fmt.Printf("%s=>%s\n", key, value)
-	}
-	shimLog.Warn("zxy withCDI print oci anno end")
-
 	_, cdiDevices, err := cdi.ParseAnnotations(annotations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse CDI device annotations: %w", err)

@@ -143,11 +143,6 @@ func (device *VFIODevice) Attach(ctx context.Context, devReceiver api.DeviceRece
 		}
 
 		attachToPCI := info[deviceBDF].attachToPCI
-		//var attachToPCI bool
-		//attachToPCI = info[deviceBDF].attachToPCI
-		//if hotPlugInfo, ok := info[deviceBDF]; ok {
-		//	// TODO zxy
-		//}
 
 		vfio := &config.VFIODev{
 			ID:       utils.MakeNameID("vfio", device.DeviceInfo.ID+strconv.Itoa(i), maxDevIDSize),
