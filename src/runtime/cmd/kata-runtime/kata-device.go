@@ -97,7 +97,7 @@ var attachDeviceCommand = cli.Command{
 			return err
 		}
 
-		return shimclient.DoPut(sandboxID, defaultTimeout, containerdshim.DeviceUrl, "application/json", encoded)
+		return shimclient.DoPut(sandboxID, defaultTimeout*10, containerdshim.DeviceUrl, "application/json", encoded)
 	},
 }
 
@@ -131,6 +131,6 @@ var detachDeviceCOmmand = cli.Command{
 			return err
 		}
 
-		return shimclient.DoDelete(sandboxID, defaultTimeout, containerdshim.DeviceUrl, "application/json", encoded)
+		return shimclient.DoDelete(sandboxID, defaultTimeout*10, containerdshim.DeviceUrl, "application/json", encoded)
 	},
 }
