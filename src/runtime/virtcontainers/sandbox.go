@@ -2272,7 +2272,11 @@ func (s *Sandbox) DetachDevice(ctx context.Context, devPath string) error {
 	for _, dev := range devices {
 		if dev.GetHostPath() == devPath {
 			deviceID = dev.DeviceID()
+			break
 		}
+	}
+	if deviceID == "" {
+		return fmt.Errorf("Device path=%s not attached", devPath)
 	}
 
 	err := s.devManager.DetachDevice(ctx, deviceID, s)

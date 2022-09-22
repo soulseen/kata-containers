@@ -96,6 +96,7 @@ var attachDeviceCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+
 		return shimclient.DoPut(sandboxID, defaultTimeout, containerdshim.DeviceUrl, "application/json", encoded)
 	},
 }
