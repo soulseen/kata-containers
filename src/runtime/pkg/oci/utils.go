@@ -475,6 +475,16 @@ func addHypervisorConfigOverrides(ocispec specs.Spec, config *vc.SandboxConfig, 
 		}
 	}
 
+	if value, ok := ocispec.Annotations[vcAnnotations.GuestHookTimeout]; ok {
+		if value != "" {
+			timeout, err := strconv.ParseInt(value, 10, 32)
+			if err != nil {
+				return err
+			}
+			config.HypervisorConfig.GuestHookTimeout = int32(timeout)
+		}
+	}
+
 	if err := newAnnotationConfiguration(ocispec, vcAnnotations.DisableImageNvdimm).setBool(func(disableNvdimm bool) {
 		config.HypervisorConfig.DisableImageNvdimm = disableNvdimm
 	}); err != nil {

@@ -1604,7 +1604,7 @@ pub async fn execute_hook(logger: &Logger, h: &Hook, st: &OCIState) -> Result<()
 
     // if timeout is set if hook, then use the specified value
     if let Some(t) = h.timeout {
-        if t > 0 {
+        if t >= 0 {
             timeout = t as u64;
         }
     }
@@ -1672,9 +1672,16 @@ pub async fn execute_hook(logger: &Logger, h: &Hook, st: &OCIState) -> Result<()
         }
     });
 
-    match tokio::time::timeout(Duration::new(timeout, 0), join_handle).await {
-        Ok(r) => r.unwrap(),
-        Err(_) => Err(anyhow!(nix::Error::ETIMEDOUT)),
+    if timeout != 0 {
+        match tokio::time::timeout(Duration::new(timeout, 0), join_handle).await {
+            Ok(r) => r.unwrap(),
+            Err(_) => Err(anyhow!(nix::Error::ETIMEDOUT)),
+        }
+    } else {
+        match tokio::task::spawn(join_handle).await {
+            Ok(r) => r.unwrap(),
+            Err(_) => Err(anyhow!(nix::Error::ETIMEDOUT)),
+        }
     }
 }
 
